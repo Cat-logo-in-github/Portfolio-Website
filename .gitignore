@@ -1,0 +1,10 @@
+node_modules/
+dist/
+public/generated/
+public/resume.pdf
+public/portfolio.html
+.DS_Store
+*.log
+.env*
+!.env.example
+coverage/

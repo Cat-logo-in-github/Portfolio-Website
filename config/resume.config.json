@@ -1,0 +1,26 @@
+{
+  "resumeFile": "resume.pdf",
+  "columnMode": "auto",
+  "pageColumns": {},
+  "minimumTextCharacters": 80,
+  "sectionAliases": [
+    { "id": "profile", "type": "profile", "label": "About", "aliases": ["Professional Summary", "Summary", "Profile", "About", "About Me", "Objective"] },
+    { "id": "experience", "type": "experience", "label": "Experience", "aliases": ["Work Experience", "Professional Experience", "Employment", "Experience", "Tutorship- Experience", "Tutorship Experience", "Teaching Experience"] },
+    { "id": "projects", "type": "projects", "label": "Projects", "aliases": ["Projects", "Projects - CS", "Selected Projects", "Personal Projects"] },
+    { "id": "education", "type": "education", "label": "Education", "aliases": ["Education", "Academic Background", "Academic Qualifications"] },
+    { "id": "technical-skills", "type": "skills", "label": "Technical Skills", "aliases": ["Technical Skills", "Skills", "Technologies", "Technology Stack", "Core Competencies"] },
+    { "id": "creative-skills", "type": "skills", "label": "Creative Skills", "aliases": ["Non - Technical Skills", "Non-Technical Skills", "Non Technical Skills", "Soft Skills", "Creative Skills"] },
+    { "id": "languages", "type": "languages", "label": "Languages", "aliases": ["Languages", "Language Proficiency"] },
+    { "id": "certifications", "type": "certifications", "label": "Certifications", "aliases": ["Certifications", "Certificates", "Licenses and Certifications"] },
+    { "id": "awards", "type": "awards", "label": "Awards", "aliases": ["Awards", "Achievements", "Honors", "Honours", "Awards and Achievements"] },
+    { "id": "activities", "type": "activities", "label": "Performing & Activities", "aliases": ["Extra-Curricular Activities", "Extracurricular Activities", "Activities"] },
+    { "id": "summer-school", "type": "education", "label": "Summer School", "aliases": ["Summer School", "Summer Schools", "Additional Training"] },
+    { "id": "content-creation", "type": "content", "label": "Content Creation", "aliases": ["Content-Creation (Science)", "Content Creation", "Science Communication", "Creative Work"] },
+    { "id": "clubs", "type": "leadership", "label": "Clubs & Leadership", "aliases": ["Clubs/Societies-Experience", "Clubs and Societies", "Leadership", "Leadership Experience"] },
+    { "id": "other-work", "type": "other", "label": "Other Work", "aliases": ["Others", "Other", "Additional Experience", "Other Experience"] },
+    { "id": "research", "type": "research", "label": "Research", "aliases": ["Research- CS", "Research", "Publications", "Research Experience", "Research and Publications"] },
+    { "id": "open-source", "type": "projects", "label": "Open Source", "aliases": ["Open Source", "Open-Source Work", "Open Source Contributions"] },
+    { "id": "volunteering", "type": "volunteering", "label": "Volunteering", "aliases": ["Volunteering", "Volunteer Experience", "Community Service"] },
+    { "id": "contact", "type": "contact", "label": "Contact", "aliases": ["Contact", "Contact Details", "Contact Information", "Professional Links", "Links"] }
+  ]
+}

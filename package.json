@@ -1,9 +1,11 @@
 {
   "name": "parshwa-world",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.13.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "node scripts/build-data.mjs && vite --host 127.0.0.1",
     "extract-resume": "node scripts/extract-resume.mjs",
@@ -13,7 +15,10 @@
     "build": "node scripts/build-data.mjs && tsc --noEmit && vite build && node scripts/validate-output.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
-  "dependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
   "devDependencies": {
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

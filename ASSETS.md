@@ -42,3 +42,11 @@ The character sprites are static front views. Walking is presented in the render
 - Water center: 37 (waves). Rectangular shore: top-left 18, top 19, top-right 20; left 36, right 38; bottom-left 54, bottom 55, bottom-right 56.
 - Additional curved corners: 3/4,21/22; inner shoreline corners 72/74,90/91,92/93.
 
+
+## Version 2 interior furnishings
+
+`public/assets/roguelike-indoors.png` is the original transparent tilesheet from [Kenney Roguelike Indoors](https://kenney.nl/assets/roguelike-indoors), an existing **CC0** pack. The creator's original license is included in `LICENSE-roguelike-indoors.txt`. This pack adds recognizable beds, bookshelves, reading desks, counters, lamps, framed documents and furniture without generated artwork. Existing dungeon props supply computers, treasure chests and trophies; existing town props supply workshop tools, notices, wells and fences.
+
+The Indoors sheet is 458 × 305 pixels: **27 columns × 18 rows**, 16 × 16 pixels per tile with **1 pixel between tiles**. For index `i`, source position is `(i % 27) × 17, floor(i / 27) × 17`; crop only 16 × 16 pixels. Do not use the spacing-free Tiny Town atlas formula for this sheet.
+
+The renderer uses semantic furniture types so layouts remain independent of the artwork. Main references: square table 5, wide table 0/1/2, bookshelf 479, paper/book 475, bed head 197 and foot 230, counter 365, framed document 344, candlestick 178. Source sheets are unchanged and all assets are hosted locally.

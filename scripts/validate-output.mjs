@@ -49,7 +49,7 @@ export async function validateOutput(root = projectRoot) {
     assert.ok(portfolio.includes(escapeHtml(entry.title)), `Fallback portfolio omits ${entry.id}.`);
     for (const detail of entry.details) assert.ok(portfolio.includes(escapeHtml(detail)), `Fallback portfolio omits a detail from ${entry.id}.`);
   }
-  for (const filename of ['tiny-town.png', 'tiny-dungeon.png', 'tiny-battle.png', 'PressStart2P-Regular.ttf']) {
+  for (const filename of ['tiny-town.png', 'tiny-dungeon.png', 'tiny-battle.png', 'roguelike-indoors.png', 'PressStart2P-Regular.ttf']) {
     const info = await stat(resolve(dist, 'assets', filename));
     assert.ok(info.size > 0, `Missing or empty local asset ${filename}.`);
   }

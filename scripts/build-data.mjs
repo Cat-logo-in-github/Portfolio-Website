@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { projectRoot, loadResumeConfig, extractResume } from './extract-resume.mjs';
 import { normalizeResume, validateResume, renderStaticPortfolio } from './normalize-resume.mjs';
 import { generateWorld } from '../src/core/world.mjs';
+import { generateInterior } from '../src/core/interior.mjs';
+import { villageScene } from '../src/core/village.mjs';
 
 export async function buildData(root = projectRoot) {
   const config = await loadResumeConfig(root);
@@ -12,6 +14,9 @@ export async function buildData(root = projectRoot) {
   const resume = normalizeResume(extraction, config);
   validateResume(resume);
   const world = generateWorld(resume);
+  // Fail the build if this résumé cannot produce playable default scenes.
+  villageScene(world);
+  for (const location of world.locations) generateInterior(resume, location);
   const generated = resolve(root, 'public/generated');
   await mkdir(generated, { recursive: true });
   await writeFile(resolve(generated, 'resume.json'), JSON.stringify(resume, null, 2) + '\n');

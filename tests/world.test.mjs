@@ -220,3 +220,22 @@ test('mixed maximum-size houses and a non-first profile root preserve corridor c
     assert.equal(world.spawn.x, world.locations[5].entrance.x);
   }
 });
+
+test('independent overworld seeds reproduce configurations without changing decoded topology', () => {
+  const resume = fixture(8), original = generateWorld(resume);
+  assert.equal(original.algorithmVersion, 2);
+  assert.equal(original.generationConfig.scope, 'village');
+  assert.equal(original.generationConfig.nodeCount, original.locations.length);
+  assert.deepEqual(original.generationConfig.sequence, original.sequence);
+  assert.deepEqual(original, generateWorld(resume, original.sequence, { layoutSeed: original.generationConfig.layoutSeed, decorationSeed: original.generationConfig.decorationSeed }));
+  const decorated = generateWorld(resume, original.sequence, { decorationSeed: 'new-flowers' });
+  assert.deepEqual(original.locations, decorated.locations);
+  assert.deepEqual(original.paths, decorated.paths);
+  assert.deepEqual(original.edges, decorated.edges);
+  assert.notDeepEqual(original.decorations, decorated.decorations);
+  const rearranged = generateWorld(resume, original.sequence, { layoutSeed: 'new-space' });
+  assert.deepEqual(original.edges, rearranged.edges);
+  assert.notDeepEqual(original.locations.map(({ x, y }) => [x, y]), rearranged.locations.map(({ x, y }) => [x, y]));
+  assertWorldGeometry(rearranged);
+  assert.throws(() => generateWorld(resume, undefined, { layoutSeed: 4 }), /string/);
+});

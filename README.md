@@ -1,10 +1,10 @@
 # Parshwa's World of Work
 
-A playable, top-down résumé portfolio built with React, TypeScript, Vite, and Canvas. Each meaningful résumé section becomes a house; its content determines the house's size. A real Prüfer code defines the village tree, and a separate layout algorithm turns that tree into walkable paths.
+A small, replayable RPG portfolio built with React, TypeScript, Vite, and Canvas. Each meaningful résumé section becomes a house; its content determines the house's size. A real Prüfer code defines the village tree, and a separate layout algorithm turns that tree into walkable paths. Version 2 adds enterable procedural interiors, contextual object choices, discoveries, a short quest, persistent progress, and optional tactical sparring.
 
 The included résumé produces **14 destinations and 51 records**: profile, education, languages, creative skills, technical skills, activities, teaching experience, summer school, content creation, projects, leadership, other work, research, and contact. These counts describe the supplied PDF, not fixed requirements. Updating the PDF can change the count, sizes, default sequence, layout, and displayed content.
 
-All extraction and initial generation happen before deployment. Visitors receive static HTML, JavaScript, CSS, JSON, local sprites, and the original PDF. There is no server, database, API service, authentication, AI parsing service, or secret to configure. Visitors can regenerate the map locally using a custom code; their résumé content remains unchanged.
+All PDF extraction, résumé normalization, and default village generation happen before deployment. Visitors receive static HTML, JavaScript, CSS, JSON, local sprites, and the original PDF. The browser generates interiors and custom configurations locally from that structured data. There is no server, database, API service, authentication, AI parsing service, or secret to configure. Local generation never changes résumé content.
 
 ## Run locally
 
@@ -23,7 +23,7 @@ Open the local URL printed by Vite. Development first extracts the source PDF an
 | `npm run dev` | Generate résumé/world data and start the local development site. |
 | `npm run extract-resume` | Extract, normalize, and validate the PDF; write résumé JSON. |
 | `npm run generate-world` | Rebuild résumé JSON, world JSON, original public PDF, and fallback portfolio. |
-| `npm test` | Run ingestion, Prüfer, map geometry, and movement tests. |
+| `npm test` | Run ingestion, Prüfer, village/interior geometry, movement, actions, saves, quests, and combat tests. |
 | `npm run typecheck` | Check TypeScript application types. |
 | `npm run build` | Generate data, check types, build with Vite, and validate the static output. |
 | `npm run preview` | Serve the existing production `dist/` build locally. |
@@ -42,16 +42,60 @@ Opening `index.html` directly through `file://` does not reproduce a hosted site
 
 - Select **Enter the village**; the game receives keyboard focus.
 - Use **WASD** or **arrow keys** to walk, and hold **Shift** to move faster.
-- Press **E** or **Space** near a house entrance to read its field notes.
+- Press **E** or **Space** near a door, NPC, sign, or object to open its context-specific actions.
 - Press **Escape** or select **Menu** to pause. Escape also closes an open panel.
-- On touch screens, hold the directional buttons and select **Read** near an entrance.
-- **Journal** exposes every résumé section without requiring movement.
+- On touch screens, hold the directional buttons and select the interaction button near a usable object.
+- **Journal** tracks discovered field notes. Select **Read complete portfolio** to switch to the reading view, or open the complete portfolio from the title/pause screen without requiring exploration or battles.
 - **Village map** lists destinations and offers fast travel; houses in its overview are also keyboard accessible.
-- **World code** accepts a custom Prüfer sequence and provides **Restore default world**.
+- **Forge** configures the village or one selected interior, with manual/random valid codes, independent layout/decoration seeds, defaults, and versioned configuration import/export.
 - Select the name in the header, or the pause menu's return action, to return to the title screen.
 - **Résumé** downloads the original PDF. `portfolio.html` offers the complete conventional reading view and works without JavaScript.
 
 Movement stops while a panel is open. Leaving browser focus clears held controls. Diagonal movement is normalized, collisions use substeps to prevent passing through buildings at low frame rates, and the camera follows the explorer. Gameplay suppresses movement-key scrolling only while the game canvas receives input. Reduced-motion settings remove walking bob and camera easing.
+
+### A short exploration loop
+
+Visit the Archivist or notice board, accept the first field trip, then enter a house. Use its books, project terminals, desks, or displays to reveal actual résumé records. **Inspect** gives a clue; the explicit discovery choice records the associated field note. Different objects offer different menus. Leave by the marked exit to return to the village. Your discoveries survive transitions and configuration changes.
+
+Find **three distinct records across at least two houses** to complete the field trip and receive one **field key**. The quest also starts automatically on your first discovery, so missing the notice board does not strand your progress. The key opens the village **Curiosity chest**, is consumed once, and awards a cosmetic badge. Opened containers and one-time rewards stay completed after revisiting or regenerating layouts.
+
+The discovery journal is an optional exploration goal. The **complete reading view**, all professional links, contact details, and the original résumé PDF remain accessible independently of it; no résumé information requires a battle.
+
+### Interiors and solid objects
+
+The exterior houses retain their coherent village appearance. Their interiors use four reusable purposes:
+
+| Interior | Functional objects and atmosphere |
+| --- | --- |
+| Home | Living/private areas and personal field notes. |
+| Library | Shelves, reading/research areas, and discoverable documents. |
+| Workshop | Workstations, project terminals, tools, and storage. |
+| Studio | Creative work, performance/writing displays, and an open work area. |
+
+Furniture, buildings, trees, rocks, signs, and suitable environmental props have solid footprints. Flowers and minor ground details remain passable. Objects expose a usable interaction side; a wall or solid prop between you and that side prevents interacting through it. Interior generation validates routes from entrance to exit and to functional objects. Lamps can be toggled, inspection can offer clues, and discovery actions unlock only their assigned source records.
+
+### Optional tactical sparring
+
+Talk to the sparring mentor to choose **Guard**, **Skirmisher**, or **Ranger**. The match uses a small **7 × 7** arena with obstacles, a visible enemy intention, health, legal movement highlights, and a short action log.
+
+Each player turn permits **one move of up to two reachable tiles** and **one action**, in either order. Select **End turn** to resolve the opponent's move/action and begin the next player turn.
+
+- **Attack:** 3 damage to an adjacent opponent.
+- **Guard:** reduces the next enemy hit by 2, then expires.
+- **Focus:** 2 damage within three tiles with clear line of sight; two charges per match.
+- **Retreat:** immediately leaves practice safely.
+
+The Guard holds position and advances when approached; the Skirmisher closes distance; the Ranger seeks a clear shot from a distance. Opponents cannot occupy your tile or pass through obstacles. Victory awards an optional sparring badge once per opponent type; replaying or rerolling seeds cannot farm rewards. Defeat and retreat cause **no permanent health, inventory, discovery, or quest loss**. The practice battle ends and you recover before returning to exploration.
+
+### Saves and regeneration
+
+Exploration uses a **version 2 localStorage save** in the visitor's browser. It retains discoveries, visited houses, opened containers, one-time actions, inventory, quests, optional wins, position, and stored village/interior configurations. Interiors are reconstructed from configuration instead of saving a large map snapshot.
+
+Saves are local to that browser and origin; they are not uploaded to GitHub or synchronized between devices. Malformed or old-version saves start a fresh journey with a warning. If the source résumé's **PDF hash changes**, the save resets explicitly so old geometry and records are not applied to a new résumé. Normalized world generation can stay identical across PDF encoding-only changes, but save identity deliberately follows the source PDF hash.
+
+Changing generation settings preserves discoveries and rewards. Stable object/action IDs keep opened containers and one-time consequences from resetting when their visuals or positions change. A newly generated scene uses a valid spawn; returning to the village restores a safe exterior position. Generation configuration sharing and personal save progress are separate: importing a configuration does not import someone else's inventory or quest rewards.
+
+You can also **Export journey save** from the menu and restore that JSON using **Import a journey save**. Journey imports validate the résumé identity, procedural configurations and saved position before applying them.
 
 ## Update the résumé
 
@@ -69,7 +113,7 @@ Routine updates require no edits to React components, coordinates, or generated 
 
 `scripts/extract-resume.mjs` uses the build-only `pdfjs-dist` dependency to extract text and hyperlink annotations. It groups PDF runs by their coordinates, preserves useful ordering, and detects ordinary two-column pages. Embedded links are retained even when visible URLs wrap across lines or a label such as a GitHub username hides the URL. The PDF is treated as data; evaluation is disabled.
 
-`scripts/normalize-resume.mjs` normalizes whitespace, matches configured heading aliases, collects identity/contact data, and groups numbered entries and wrapped bullets. It supports optional sections and keeps the source text for audit. Records have stable identifiers, dates, subtitles, details, and safe links. The supplied PDF has no separate professional title; the display label “Computer Science · Mathematics · Creative Practice” is derived from its education and creative content. The parser does not invent missing employers, dates, metrics, or links.
+`scripts/normalize-resume.mjs` normalizes whitespace, matches configured heading aliases, collects identity/contact data, and groups numbered entries and wrapped bullets. It supports optional sections and keeps the source text for audit. Records have stable identifiers, dates, subtitles, details, and safe links. The supplied PDF has no separate professional title; the display label “Computer Science · Mathematics · Creative Practice” is derived from its education and creative content. The parser does not invent missing employers, dates, metrics, or links. Default village props and every default interior are also generated and validated during the build, so an unsupported source cannot silently publish an unusable scene.
 
 Validation rejects empty content, unrecognized section sets, missing identity, duplicate identifiers, malformed records, and unsafe URLs. Text in the no-JavaScript portfolio is HTML escaped; React renders résumé content as text. External web links use `noopener noreferrer`.
 
@@ -121,7 +165,34 @@ Coordinates are generated separately from connectivity. The layout roots the tre
 
 Seeded trees, bushes, flowers, and rocks avoid roads, entrances, buildings, and the spawn zone. Buildings stay within computed world bounds. The camera and map menu support larger trees.
 
-A visitor's valid custom code regenerates the tree, coordinates, routes, and decoration through the **same `src/core/world.mjs` generator** used at build time. Invalid input shows an error while preserving the current map. The default and custom modes are visibly identified. Custom maps are temporary and do not modify repository files or the résumé.
+A visitor's valid custom village code regenerates the tree, coordinates, routes, and decoration through the **same `src/core/world.mjs` generator** used at build time. Invalid input shows an error while preserving the current map. Custom configurations are stored with local exploration progress and do not modify repository files or the résumé.
+
+### Configure room topology separately
+
+In **Forge**, select **Village** or a specific building interior. The village house count is read-only because it comes from the résumé. Interiors support **2–10 rooms** and configurable home/library/workshop/studio archetypes. A room graph describes semantic room connections; each node represents a room, not a floor tile.
+
+Enter `n − 2` labels from `1` through `n`, or use **Generate valid random code**. Repeated labels are legal. Separate **layout seed** and **decoration seed** fields control independent streams: changing decoration does not change the requested room graph. The editor previews the room graph and names its assigned room roles. **Restore defaults** populates the editor; select Generate to apply them.
+
+The interior pipeline decodes the tree, assigns archetype-compatible public and private functions, sizes and places rooms, connects boundaries with doorways/corridors, places furniture with usable adjacent spaces, then checks overlap, movement, exit/object reachability, and semantic requirements. Private roles are assigned to leaf nodes so they do not become mandatory routes to public functions. Invalid input or incompatible constraints produce feedback; the requested Prüfer tree is never silently rewritten.
+
+**Download configuration** exports JSON; paste it under **Import a shared configuration** to validate and apply it. The compact configuration records `algorithmVersion: 2`, scope, building/archetype where relevant, node count, sequence, layout seed, and decoration seed. Identical valid full configurations reproduce the same interior. Old algorithm versions are rejected explicitly; reset or recreate them rather than silently obtaining different geometry.
+
+Example interior configuration:
+
+```json
+{
+  "algorithmVersion": 2,
+  "scope": "interior",
+  "buildingId": "location-projects",
+  "archetype": "workshop",
+  "nodeCount": 4,
+  "sequence": [1, 2],
+  "layoutSeed": "first-workshop",
+  "decorationSeed": "quiet-afternoon"
+}
+```
+
+Use a building ID from the current résumé. Imported settings are validated before generation, and the original portfolio content remains unchanged.
 
 ## Publish on GitHub Pages
 
@@ -143,11 +214,13 @@ If you later add a custom domain, configure the chosen domain and DNS in GitHub 
 
 ## Tests and output checks
 
-Automated coverage includes PDF wrapper errors and scanned-file detection; normalization and optional/configured headings; current-source integration; annotation links; safe HTML/URLs; wrapped bullets; stable identifiers; relative asset paths; Prüfer validation and encoding/decoding; edge count/connectivity/cycles; importance sizing; deterministic defaults; altered custom topology; bounds and house overlap; path endpoints; unrelated road crossings; decoration clearance; diagonal speed; collisions, wall sliding, tunneling prevention, and interaction range.
+Automated coverage includes PDF wrapper errors and scanned-file detection; normalization and optional/configured headings; current-source integration; annotation links; safe HTML/URLs; wrapped bullets; stable identifiers; relative asset paths; Prüfer validation and encoding/decoding; edge count/connectivity/cycles; importance sizing; deterministic defaults; altered custom topology; village/interior bounds and overlap; path/door endpoints; unrelated road crossings; semantic room functions; furniture/decoration clearance; diagonal speed; solid-object collisions, wall sliding, tunneling prevention, and interaction line of sight.
+
+Version 2 adds **19 passing action/progress/combat tests**: preconditions and feedback, source-linked discoveries, quest completion and one-time rewards, resource consumption, repeat input, scene events, save restoration, malformed/versioned saves, bounded legal combat movement, ranges/LOS, guard/focus costs, distinct AI behavior and safe fallback, all terminal outcomes, invalid-state recovery, and anti-farming rewards. The final complete-suite result is recorded separately in the verification document.
 
 The production validator checks deployed JSON references, regenerates the world for an exact comparison, compares the deployed PDF byte-for-byte with the source, verifies every fallback portfolio record/detail, confirms local sprite/font files, checks HTML/CSS references under a simulated repository subpath, and ensures one deployed PDF copy.
 
-See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for the executed checks and any remaining review items. Passing local tests/builds are separate from a live deployment; hosting requires the Pages steps above.
+See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for executed checks and [`docs/V2-CHANGES.md`](docs/V2-CHANGES.md) for the feature handoff. No browser preview or browser gameplay QA is claimed for this update; the user's request to skip previews was retained. Passing automated tests/builds are separate from a live deployment; hosting requires the Pages steps above.
 
 ## Troubleshooting and practical limits
 
@@ -158,8 +231,12 @@ See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for the executed checks and a
 - **Missing generated JSON during development:** use `npm run dev` or `npm run generate-world` from the repository root.
 - **A Pages deployment is skipped:** confirm the selected branch is the repository's default branch. Confirm Pages publishing source is GitHub Actions.
 - **Missing files or a blank deployed site:** confirm the source was uploaded at repository root, dotfolders were retained, and the Actions build uploaded `dist/`. Review the failed workflow step before rerunning it.
+- **A configuration is rejected:** check algorithm version 2, the target building ID, room count 2–10, exact sequence length, valid labels, and nonempty seeds. Village house count must match the current résumé.
+- **A save resets:** older save versions, malformed content, and changed source-PDF hashes are handled by starting a fresh journey with a message. Personal progress exists only in the current browser's local storage.
+- **An action is unavailable:** the menu explains required items or completed one-time actions. Inspect a chest for the clue to its key; there is no penalty for cancelling an interaction.
+- **Focus or movement is unavailable:** use highlighted reachable arena tiles; Focus needs a remaining charge, range, clear sight, and an unused action this turn. End turn resets the move/action allowance.
 
-This is a portfolio explorer: houses open readable journals rather than playable building interiors. The imported character sprite is a static front view with movement, facing mirroring, and a small walking bob; it is not a full directional animation set. The layout prioritizes readable, noncrossing paths and can become wide or tall for unusually large résumés. Fast travel and the conventional portfolio remain available. No audio is required or included. Essential assets are local, but the application does not install an offline service worker.
+The scope is deliberately compact: four interior archetypes, one discovery quest and one optional sparring goal, small inventory/cosmetic rewards, and three tactical opponent types. There is no large crafting tree, economy, or mandatory grind. The imported character sprite is a static front view with movement, facing mirroring, and a small walking bob; it is not a full directional animation set. Layouts prioritize readable, validated paths and can become wide or tall for unusually large résumés. Fast travel and the conventional portfolio remain available. No audio is required or included. Essential assets are local, but the application does not install an offline service worker. Mid-battle state is not saved; exploration progress and completed battle rewards are.
 
 ## Source structure and artwork
 
@@ -168,12 +245,17 @@ resume.pdf                  Original source of truth
 config/resume.config.json   Heading/layout configuration
 scripts/                    Build-time extraction, normalization and validation
 src/core/world.mjs          Shared deterministic tree/world generator
+src/core/interior.mjs       Semantic rooms, spatial layout and validation
+src/core/village.mjs        Reusable village object/action definitions
+src/core/progress.mjs       Discoveries, action rules, quests and versioned saves
+src/core/combat.mjs         Tactical turns, range, AI and outcome rewards
 src/game/                   Canvas renderer and movement/collision helpers
 src/components/             Semantic journal, links and modal UI
 public/assets/              Existing local sprite sheets, font and licenses
 tests/                      Node test suites
 .github/workflows/          Automatic static Pages deployment
 docs/VERIFICATION.md        Verification record
+docs/V2-CHANGES.md          Version 2 feature and usage handoff
 ```
 
 The sprite sheets are existing **Kenney** assets. The locally hosted pixel font is **Press Start 2P** by Cody Boisclair. No AI-generated artwork is included. Source URLs, original licenses, and atlas details are documented in [`ASSETS.md`](ASSETS.md), with license notices retained in `public/assets/`. Local files avoid fragile asset hotlinks. The game's visual concept takes inspiration from the requested reference while its content, layout, and interface are an original implementation.

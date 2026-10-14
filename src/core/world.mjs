@@ -109,7 +109,7 @@ function stableStringify(value) {
   return JSON.stringify(value) ?? 'null';
 }
 
-function hashString(text) {
+export function hashString(text) {
   let hash = 2166136261;
   for (let i = 0; i < text.length; i++) {
     hash ^= text.charCodeAt(i);
@@ -118,7 +118,7 @@ function hashString(text) {
   return hash >>> 0;
 }
 
-function seededRandom(seed) {
+export function seededRandom(seed) {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -317,14 +317,20 @@ function decorateWorld(locations, paths, bounds, spawn, random) {
 }
 
 /** Generate the exact same static model at build time and after a visitor edits the code. */
-export function generateWorld(resume, selectedSequence) {
+export function generateWorld(resume, selectedSequence, options = {}) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('World generation options must be an object.');
+  for (const key of ['layoutSeed', 'decorationSeed']) if (options[key] !== undefined && (typeof options[key] !== 'string' || options[key].length > 160)) throw new Error(`${key} must be a string of at most 160 characters.`);
   const content = { generationVersion: GENERATION_VERSION, name: resume?.name, title: resume?.title, summary: resume?.summary, contact: resume?.contact, links: resume?.links, sections: resume?.sections };
   const seed = hashString(stableStringify(content));
   const locations = locationsFromResume(resume, seed);
   if (selectedSequence !== undefined) validateSequence(selectedSequence, locations.length);
   const sequence = selectedSequence === undefined ? defaultSequence(locations, seededRandom(seed)) : [...selectedSequence];
   const edges = decodePrufer(sequence, locations.length);
-  const { paths, bounds, spawn } = layoutTree(locations, edges, seed);
-  const decorations = decorateWorld(locations, paths, bounds, spawn, seededRandom(hashString(`${seed}:decorations:${sequence.join(',')}`)));
-  return { schemaVersion: GENERATION_VERSION, seed, sequence, locations, edges, paths, bounds, spawn, decorations };
+  const layoutSeed = options.layoutSeed ?? String(seed);
+  const decorationSeed = options.decorationSeed ?? String(seed);
+  const layoutStream = layoutSeed === String(seed) ? seed : hashString(`${seed}:layout:${layoutSeed}`);
+  const { paths, bounds, spawn } = layoutTree(locations, edges, layoutStream);
+  const decorationStream = decorationSeed === String(seed) ? hashString(`${seed}:decorations:${sequence.join(',')}`) : hashString(`${seed}:decorations:${decorationSeed}:${sequence.join(',')}`);
+  const decorations = decorateWorld(locations, paths, bounds, spawn, seededRandom(decorationStream));
+  return { schemaVersion: GENERATION_VERSION, algorithmVersion: 2, seed, sequence, locations, edges, paths, bounds, spawn, decorations, generationConfig: { algorithmVersion: 2, scope: 'village', nodeCount: locations.length, sequence: [...sequence], layoutSeed, decorationSeed } };
 }

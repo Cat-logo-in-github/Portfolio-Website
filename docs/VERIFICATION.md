@@ -1,31 +1,38 @@
-# Version 2.0 verification
+# Version 3.0 verification
 
 ## Completed checks
 
-- **65 automated tests passed; zero failures.** Coverage: 11 résumé-ingestion tests, 12 world/Prüfer tests, 11 interior-generation tests, 12 movement/solid-collision tests, 9 action/progress/save tests, and 10 tactical-combat tests.
-- **TypeScript check and production build passed.** Static-output validation passed.
-- **Clean ZIP rebuild passed:** extracted the source ZIP into a fresh folder with no node_modules, dist, or generated content; ran `npm ci`, `npm test`, and `npm run build` successfully. Tests extract the source PDF directly and do not depend on leftovers from another build.
-- The supplied source still generates **14 houses and 51 résumé records**. Every default interior is generated and validated during the build; unsupported default scenes fail before deployment.
-- Prüfer encoder/decoder round trips cover every sequence through six vertices. Interior tests cover every tree from two through five rooms across four archetypes (580 configurations), plus 81 larger seeded star/chain/random configurations with 2–10 rooms.
-- All 14 actual résumé interiors passed physical floor/collision/interaction validation. All 119 furniture/record/exit interaction points are reachable and select their intended object. Corridor movement simulation used the actual movement code.
-- Village checks covered 120 custom code/seed configurations; additional route checks reached 90 essential NPC/board/chest/well targets across 18 worlds. A retained regression test covers 40 configurations and walks every decoded road. Separate checks passed 15 one-, two-, and three-house worlds.
-- Semantic record actions inspect without unlocking, then read/examine the related object to unlock only its actual source record IDs. Repeated rewards/actions, key consumption, quest completion, regeneration, and save/reload are tested.
-- Combat tests verify legal movement, obstacles, attack/focus ranges and line of sight, explicit turns, defensive effects, distinct enemy behavior, fallback actions, victory/defeat/retreat, invalid-state handling and reward limits.
-- The production PDF is **byte-for-byte identical** to the original. The static artifact contains exactly one PDF copy. The no-JavaScript portfolio retains every source record/detail and all embedded professional links.
-- Essential sprites and fonts are local. HTML/CSS references passed project-subpath validation. The added indoor sprite sheet is an unchanged existing Kenney CC0 asset with its license retained.
-- Final production bundle: approximately **322 KB JavaScript / 103 KB gzip** and **27 KB CSS / 6.5 KB gzip**, plus local sprites, font, JSON and the original PDF. No new runtime package dependency was added.
+- **122 automated tests passed; zero failures.** The full suite covers résumé ingestion, Prüfer/village/interior generation, solid collision, source-linked actions, legacy saves/quests/sparring, dialog navigation, puzzles/story, expedition slots, session restoration, encounters, command battles and audio.
+- **TypeScript and production build passed.** The output validator verifies local sprites/fonts, all 21 real PCM WAV files, GitHub Pages project-subpath references, complete fallback portfolio content, and an exact copy of the original résumé.
+- The source still produces **14 houses and 51 professional records**. The original PDF matches the supplied download by SHA-256: `4fa2b578c11797fd89951b15cc6209af309144ec81e91ff383c2e5cfee43fece`.
+- The complete main clue chain through the boss ending is exercised through save/reload and seed switching. Puzzle checks cover all 16 Hamming payloads and all seven single-bit error positions, multiple-error miscorrection rejection, real smallest-leaf Prüfer reconstruction, graph connectivity/shortest routes, equivalent logic answers, and classical cipher rules.
+- Story tests cover 60 solvable seeds, all 14 real interiors with default/two-room/ten-node-star configurations, crowded-station fallback, and one-building worlds. All seven story stages keep solid story objects at identical coordinates; portals are reserved before being unlocked. Existing résumé actions remain available.
+- Session tests restore the saved feet against the decorated scene, retain canonical spawn/placement, recover malformed attempt counters, validate story dependencies, preserve V2 discoveries/inventory/custom rooms, and retain completed endings across new expeditions.
+- DOM regression tests verify inspection focus, WASD/arrows, Enter/Space activation, repeat protection, checkbox/radio toggles, native text/select/slider editing, details, pointer clicks, SVG destinations, panel switching, disabled-node recovery and focus trapping. Click-to-walk uses the actual collision rules.
+- Encounters count actual walking, protect new areas, respect pause/teleports, and vary by seed/region. Duel tests cover distinct intentions, guard/analyze/technique/item effects, safe escape/defeat and a winnable guardian without grinding.
+- Audio tests use a fake AudioContext to check gesture-gated startup, context changes, duplicate-loop prevention, volumes/mute, bounded effects, suspension/resume, failed assets and StrictMode reuse. File tests verify nonempty, distinct real tracks. Runtime assets are local.
+- Current production bundle: approximately **420 KB JavaScript / 138 KB gzip** and **49 KB CSS / 12 KB gzip**, plus the original PDF, JSON, local sprites, font and audio.
+
+## ZIP validation
+
+**Clean ZIP rebuild passed:** extracted a source archive into a new folder with no dependencies, build output or generated résumé data; installed all 109 locked packages with `npm ci`; ran all **122 tests successfully** and completed `npm run build`, including TypeScript and static-output validation. The final archive contains the identical verified code/assets plus this completed verification note. Generated files are rebuilt by GitHub Actions.
+
+## Actual application DOM check
+
+A separate offline jsdom check mounted the actual Vite-bundled App with source résumé/world data and a seeded save. It passed title load, Journal pointer opening and S navigation, Portfolio toggling/focus preservation, Escape pause, Enter resume/canvas focus, Sound checkbox Enter toggle/S navigation, Enter house entry, click-to-walk to generated interior furniture, and its actual Inspect action via Enter. No DOM runtime errors were captured. Canvas rendering, images and audio were stubbed; this is an application integration check, not a visual/browser play-test.
 
 ## Browser review and hosting
 
-Browser gameplay and mobile visual review were **not performed**. The owner's earlier request to stop preview attempts was respected. Automated movement, interaction, generation and state checks are not presented as a browser play-test.
+No browser preview, browser gameplay play-test, mobile visual review, or listening test was performed. The owner's earlier instruction to stop preview attempts was respected. DOM/state/physics checks do not establish visual polish, real-device autoplay behavior, or absence of every browser runtime issue.
 
-No GitHub account access was used and no deployment was performed. Replace the repository's source contents with this ZIP's `parshwa-world` contents, preserve `.github/workflows/deploy.yml`, and keep Pages publishing set to GitHub Actions. Push to the configured default branch to build and deploy.
+No GitHub account access was used and nothing was deployed. Replace the repository source contents with this archive's `parshwa-world` contents, including `.github/workflows/deploy.yml`. Keep Pages publishing set to **GitHub Actions** and push to the repository's default branch. The workflow installs locked dependencies, runs tests, rebuilds the PDF-derived data/site and uploads `dist`.
 
 ## Practical limits
 
-- Interiors support 2–10 rooms and four archetypes: home, library, workshop and studio. Very large sections or extreme graphs can reach bounded geometry/capacity limits; generation reports a clear error without dropping records or changing a requested tree.
-- Character sprites are existing static front views with mirroring and optional movement bob. No audio or offline service worker is included.
-- Mid-battle state is not saved. Completed battle rewards and exploration progress are saved; defeat/retreat have no lasting penalty.
-- Journey saves are local to the browser/origin, with JSON export/import. Malformed/outdated saves reset with a warning; a changed source-PDF hash resets progress explicitly. Generation configuration changes preserve discoveries and rewards.
-- OCR is not bundled. Scanned PDFs require a searchable export; unusual headings or columns may need the documented configuration/parser adjustments.
-- The complete Reading view and unchanged résumé download are always available independently of discovery, quests and combat.
+- A compact authored mystery, six puzzle types (five main and one optional), four interior archetypes, contextual recurring NPCs, visible optional challenges, paced surprise battles and one ending are implemented. There is no party/capture system, extensive economy, dynamic NPC schedule simulation, offline service worker or mid-battle save.
+- Existing directional/action sprites are reused honestly: run speeds up the walk cycle; some compatible poses are reused for interaction/victory/hurt/defeat. Enemy sprites use short effects rather than complete custom animation sheets for every state.
+- Interiors support 2–10 rooms. Unsupported or excessively crowded configurations report errors rather than dropping records or requested tree edges. Dense story placements attach actions to existing accessible solid furniture. Only explicitly flat paper notes and ground decoration are intentionally walkable.
+- Main progression never depends on random encounters or optional collectibles. The unlocked archive route is a usable shortcut to the existing archive house; it does not rewrite the underlying tree geometry. Full portfolio reading and the original PDF remain accessible at any stage.
+- Saves are browser/origin-local, with journey/book exports and imports. New seeds and imported journeys append slots; capacity is twelve. Incompatible stored books are protected from autosave and can be downloaded from the pause menu. Incompatible source journeys receive a new recovery slot when capacity permits; original saved text is retained.
+- Custom Forge overrides reproduce with the **seed plus saved configuration**. Save-book/story generator version 3 and the retained geometry-configuration version 2 are separate contracts.
+- OCR is not bundled. Scanned PDFs need a searchable export; unusual document layouts can require parser/configuration adjustments.

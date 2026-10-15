@@ -1,0 +1,8 @@
+Explorer action sprites
+Creator: Bennyboi_hack
+Source: https://opengameart.org/content/basic-16x16-character-sprites-4-directional
+Original file: https://opengameart.org/sites/default/files/sprites_24.png
+License declared by the creator: Creative Commons Zero (CC0 1.0)
+License terms: https://creativecommons.org/publicdomain/zero/1.0/
+
+The original PNG is included unchanged. The game decodes its exact background color key into an offscreen canvas at runtime; no new artwork is generated.

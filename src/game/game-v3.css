@@ -1,0 +1,43 @@
+/* Game input and dialog controls. These rules do not disable native pointer events. */
+.world-stage canvas { touch-action: none; cursor: crosshair; }
+.modal-shade { z-index: 1000; pointer-events: auto; }
+.modal { pointer-events: auto; isolation: isolate; }
+.modal :is(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid #bd7a25; outline-offset: 3px; }
+.modal [hidden] { display: none !important; }
+.modal summary { cursor: pointer; min-height: 36px; padding-block: 7px; }
+.modal :is(select, textarea, input) { touch-action: manipulation; }
+.modal .object-actions .button { min-height: 48px; }
+.game-topline :is(.exit-interior, .mystery-objective) { pointer-events: auto; }
+.touch-controls.hidden { display: none !important; }
+@media (pointer: coarse), (max-width: 900px) {
+  .touch-controls { display: flex; position: absolute; inset: auto 16px max(16px, env(safe-area-inset-bottom)); justify-content: space-between; align-items: flex-end; gap: 16px; pointer-events: none; }
+  .dpad { display: grid; grid-template: repeat(3, 48px) / repeat(3, 48px); gap: 5px; pointer-events: auto; touch-action: none; }
+  .dpad button { width: 48px; height: 48px; min-width: 48px; min-height: 48px; padding: 0; border-radius: 7px; background: #f8efdaeb; border: 2px solid #334b42; color: #263a31; font: bold 28px/1 monospace; box-shadow: 2px 3px 0 #172a2855; touch-action: none; user-select: none; }
+  .dpad .up { grid-area: 1 / 2; } .dpad .left { grid-area: 2 / 1; } .dpad .right { grid-area: 2 / 3; } .dpad .down { grid-area: 3 / 2; }
+  .dpad button:active { transform: translateY(2px); background: #e5d094; }
+  .touch-interact { width: 76px; height: 76px; min-width: 76px; min-height: 76px; padding: 7px; pointer-events: auto; border: 2px solid #334b42; border-radius: 50%; background: #f8efdaee; color: #263a31; box-shadow: 2px 3px 0 #172a2855; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; touch-action: manipulation; }
+  .touch-interact .touch-action-icon { font: 29px/1 Georgia, serif; }
+  .touch-interact > span:last-child { font: bold 12px/1.2 'Courier New', monospace; }
+  .touch-interact:disabled { opacity: .48; }
+  .mini-map { top: 100px; right: 16px; bottom: auto; width: 120px; }
+  .mini-map svg { height: 60px; }
+  .interaction-prompt { bottom: 185px; max-width: min(460px, calc(100% - 36px)); min-width: min(240px, calc(100% - 36px)); padding: 10px 14px; }
+}
+@media (pointer: coarse) and (max-height: 550px) {
+  .mini-map { display: none; }
+  .interaction-prompt { left: auto; right: 16px; bottom: 100px; transform: none; max-width: calc(100% - 198px); min-width: 0; }
+}
+@media (max-width: 420px) {
+  .touch-controls { left: 12px; right: 12px; }
+  .modal-shade { padding: 9px; }
+  .modal { width: 100%; max-height: calc(100dvh - 18px); }
+  .modal-header { gap: 10px; }
+  .modal-header > span { min-width: 0; overflow-wrap: anywhere; }
+}
+@media (max-width: 650px) {
+  /* The full map remains one tap away in navigation; leave room for the objective and controls. */
+  .mini-map { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dpad button:active { transform: none; }
+}

@@ -1,6 +1,6 @@
 # Asset sources and licenses
 
-All visual game sprites are existing **Kenney** assets downloaded from the creator's website. No generated artwork is included. The packed PNG sheets are unchanged copies from their respective downloads and are stored locally, so the game does not depend on an external asset server.
+Game sprites use existing **Kenney** and **OpenGameArt** assets from the creators credited below. No generated artwork is included. The PNG sheets are unchanged copies from their respective downloads and are stored locally, so the game does not depend on an external asset server.
 
 | File | Creator's source | License | Used for |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ All tiles are 16 × 16 pixels with no spacing in the packed sheets. Tiny Town an
 - Companions: 84 wizard, 86 bald adventurer, 87 helmeted adventurer, 99/100 other villagers.
 - Treasure chests: 89–92. Coin stack: 82. Potions: 113–116.
 
-The character sprites are static front views. Walking is presented in the renderer through sprite movement and a small step bob.
+These original Tiny Dungeon character tiles are static front views and remain useful for enemy/NPC fallback art. Version 3 uses the separate directional action sheets described below for the explorer and animated villagers.
 
 ### Tiny Battle water
 
@@ -50,3 +50,14 @@ The character sprites are static front views. Walking is presented in the render
 The Indoors sheet is 458 × 305 pixels: **27 columns × 18 rows**, 16 × 16 pixels per tile with **1 pixel between tiles**. For index `i`, source position is `(i % 27) × 17, floor(i / 27) × 17`; crop only 16 × 16 pixels. Do not use the spacing-free Tiny Town atlas formula for this sheet.
 
 The renderer uses semantic furniture types so layouts remain independent of the artwork. Main references: square table 5, wide table 0/1/2, bookshelf 479, paper/book 475, bed head 197 and foot 230, counter 365, framed document 344, candlestick 178. Source sheets are unchanged and all assets are hosted locally.
+
+## Version 3 character animation
+
+- `public/assets/explorer-actions.png`: the unchanged [Basic 16×16 character sprites, 4 directional](https://opengameart.org/content/basic-16x16-character-sprites-4-directional) sheet by **Bennyboi_hack**, released as **CC0 1.0**. It contains genuine, distinct front/back/left/right walking frames, holding/interacting poses, sword attacks, shields, and falling/tumbling poses. The file is 170 × 153 pixels, with 10 columns and 9 rows; source cells are 16 × 16 with a 17-pixel stride. Its original magenta background key is removed only while decoding into an offscreen canvas at runtime. The distributed PNG is unchanged. Running uses the authored walking gait at a faster cadence; it is not a separately drawn run sheet. Victory reuses the raised-arm holding frames, and hurt/defeat use the authored fall frames. Exact state timing and frame coordinates are defined in `src/game/animation.mjs`.
+- `public/assets/villager-actions.png`: the unchanged [Man Sprite 16×16](https://opengameart.org/content/man-sprite-16x16) sheet by **dutzy**, based on work by **russpuppy**, released as **CC0 1.0**. This 128 × 64 sheet uses 16-pixel cells without gaps. Existing blink and arm/working frames provide simple, distinct NPC idle behaviors.
+
+Source and license records are retained in `LICENSE-explorer-actions.txt` and `LICENSE-villager-actions.txt`. No generated artwork is included. Animation is independent of collision geometry, and reduced-motion mode selects fixed, direction-correct poses.
+
+## Version 3 audio
+
+Seven original music loops and fourteen sound effects are stored locally in `public/audio/`. Their CC0 dedication, format, composition notes and filename inventory are recorded in `public/audio/README.md`. They use original oscillator/noise synthesis and do not contain proprietary samples or game melodies.

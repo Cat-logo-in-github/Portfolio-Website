@@ -1,0 +1,9 @@
+import { useState } from 'react';
+import { normalizeAudioSettings } from '../audio/audio.mjs';
+
+export default function AudioSettings({ manager, onChange }: { manager: any; onChange?: (settings: any) => void }) {
+  const [settings, setSettings] = useState(() => normalizeAudioSettings(manager.getSettings()));
+  const [message, setMessage] = useState('Sound starts after you choose Enable sound or begin playing.');
+  const update = (value: any) => { const next = manager.setSettings({ ...settings, ...value }); setSettings(next); onChange?.(next); };
+  return <section className="audio-settings"><span className="eyebrow">A LITTLE ATMOSPHERE</span><h2>Sound and music</h2><p>Original local chiptune music follows the village, rooms, puzzles and encounters. Every clue also has visible feedback.</p><button className="button primary" onClick={async () => { const ready = await manager.unlock(); setMessage(ready ? 'Sound is enabled. Adjust the levels below.' : 'Audio could not start in this browser. You can continue playing.'); if (ready) void manager.effect('confirm'); }}>Enable sound / resume audio</button><label className="audio-mute"><input type="checkbox" checked={settings.muted} onChange={e => update({ muted: e.target.checked })} />Mute all sound</label>{(['master', 'music', 'sfx'] as const).map(key => <label className="audio-slider" key={key} htmlFor={`audio-${key}`}><span>{key === 'master' ? 'Master volume' : key === 'music' ? 'Music volume' : 'Sound effects'} <output>{Math.round(settings[key] * 100)}%</output></span><input id={`audio-${key}`} type="range" min="0" max="1" step="0.01" value={settings[key]} onChange={e => update({ [key]: Number(e.target.value) })} /></label>)}<button className="button secondary" onClick={() => { void manager.unlock().then(() => manager.effect('collect')); }}>Test sound effect</button><p role="status" className="muted">{message}</p></section>;
+}

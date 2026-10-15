@@ -1,10 +1,45 @@
-# Parshwa's World of Work
+# The Missing Room · World of Work
 
-A small, replayable RPG portfolio built with React, TypeScript, Vite, and Canvas. Each meaningful résumé section becomes a house; its content determines the house's size. A real Prüfer code defines the village tree, and a separate layout algorithm turns that tree into walkable paths. Version 2 adds enterable procedural interiors, contextual object choices, discoveries, a short quest, persistent progress, and optional tactical sparring.
+A small, replayable mystery RPG portfolio built with React, TypeScript, Vite, and Canvas. Every generated village has the same strange omission: an archive that the maps insist should not exist. Follow connected clues, repair machines, reconstruct routes, meet the Quiet Indexer, and leave room for unfinished ideas. Real résumé projects remain optional discoveries inside the adventure.
+
+Version 3 extends the existing village, interiors, contextual actions, discovery journal, Forge, saves, and tactical sparring. It adds seeded expedition slots, an authored mystery with six CS puzzle types, paced route encounters, a command battle presentation, directional action sprites, and actual original music/SFX assets. No proprietary game characters, music, or story content are used.
 
 The included résumé produces **14 destinations and 51 records**: profile, education, languages, creative skills, technical skills, activities, teaching experience, summer school, content creation, projects, leadership, other work, research, and contact. These counts describe the supplied PDF, not fixed requirements. Updating the PDF can change the count, sizes, default sequence, layout, and displayed content.
 
 All PDF extraction, résumé normalization, and default village generation happen before deployment. Visitors receive static HTML, JavaScript, CSS, JSON, local sprites, and the original PDF. The browser generates interiors and custom configurations locally from that structured data. There is no server, database, API service, authentication, AI parsing service, or secret to configure. Local generation never changes résumé content.
+
+## Begin an expedition
+
+Start with the generated shareable seed, or enter your own seed in the expedition interface. A new expedition creates another save slot, preserving the previous journey. You can return to a saved expedition or replay a seed; the same seed and generator version reproduce its topology and puzzle instances. Up to **12 expeditions** are retained before the interface asks you to export/back up rather than overwrite a journey.
+
+The **mystery journal** links collected pages, missing clues, the current objective, and the next house to visit. NPC dialogue and device results change as the mystery advances. The main sequence is authored and validated; the seed changes puzzle values, location choices, layouts, encounter rolls, and optional details around it. Quiet stretches, optional margins, and existing professional field notes remain available between story beats.
+
+### Six connected CS devices
+
+| Device | What you do | What changes |
+| --- | --- | --- |
+| Caesar margin | Use the calibration pair and decoding wheel to recover the shifted note. | Reveals the damaged transmission's clue. |
+| Hamming(7,4) console | Inspect even-parity groups, compute the syndrome, and flip the promised single damaged bit. | Restores a signal/page and the route sketch. |
+| Prüfer route sketch | Select each smallest current leaf and its next neighbor, drawing the actual decoded tree. | Reveals the omitted archive route. |
+| Network repair | Choose a bridge reconnecting two islands, then trace a shortest route. | Restores access to the archive clue. |
+| XOR/AND relay | Toggle four switches until both target outputs match. | Releases the Quiet Indexer's final protocol. |
+| Vigenère afterword | Apply the repeating-key clue and inspect the changing plaintext preview. | Adds an optional page and deepens the ending. |
+
+Every device has state-aware explanations, graduated hints, retries, a known valid generated answer, and a visible effect on the mystery. A correct solution opens “What you proved,” explaining the CS concept with your exact values. Click/tap graph nodes directly or use the labeled keyboard controls. Hamming uses even parity with positions 1, 2 and 4 as parity bits; correction is valid under the explicitly promised single-error condition. The classical ciphers are educational historical puzzles, not secure encryption. You never need to read a long résumé description to solve the story.
+
+### Route encounters and command battles
+
+Walking can reveal a **Copper Automaton**, **Ink Ambusher**, **Corrupted Signal**, **Signal Wisp**, or **Footnote Mimic**. Encounter tables depend on the region and seed. The tracker counts actual walking, protects the opening stretch and every new area's entrance (including another interior of the same type), applies a travel cooldown, avoids immediate repeat opponents, and cannot trigger during menus/puzzles or from teleports. Ordinary wins award cosmetic **signal tokens**; rare variants award **prismatic tokens**. Random encounters are not prerequisites for the main story. The pause menu's **Surprise encounters while walking** checkbox disables surprise battles while leaving the story guardian available.
+
+Ordinary encounters use a composed sprite battle scene with health bars, enemy intention, messages, and fast commands. **Attack** deals 4 damage. **Guard** blocks 5 damage from the response. **Analyze** records the repeating pattern, exposes the next strike for 2 bonus damage, and weakens the next two incoming attacks. **Technique** interrupts a response and spends a limited charge; solved clues improve its strength/charges. Each encounter supplies one **practice tonic**, and **Escape always works**, including retreating from the story boss to retry later. Defeat never erases exploration progress.
+
+The **Quiet Indexer** uses patterns introduced by ordinary encounters. Solving the five main devices enables the final protocol; understanding its charges, heavy strikes, pulses, and recovery openings is more useful than grinding. The existing optional tactical grid sparring remains available separately; its older turn rules are documented below.
+
+### Sound and animation
+
+Audio begins only after a user gesture. The **audio settings** offer master, music, SFX, mute, an enable/resume button, and a test effect. Seven original 7.68-second chiptune loops distinguish village, interiors/archive, mystery, puzzle, battle, boss, and victory contexts. Fourteen real local WAV effects cover movement, interactions, collection, pages, puzzle success, doors, encounters, attacks, guard, and outcomes. The central manager fades changes, bounds effect overlap, handles failed assets, and suspends for pause/inactive tabs. Settings persist with the expedition save book. Audio is optional for understanding every clue.
+
+Existing CC0 action sheets supply distinct directional movement frames plus authored sword, shield, holding, and fall frames. Run reuses the authored gait at a faster cadence; interact/victory and hurt/defeat reuse compatible authored poses. These are not claims of independently drawn frame sets for every state. Battle attack/hit/guard/reveal effects stay below 300 ms and do not lock input; reduced motion disables decorative effects. Audio-manager behavior and actual WAV files are tested, while listening quality, browser autoplay, and visual feel still need device/browser verification.
 
 ## Run locally
 
@@ -42,16 +77,16 @@ Opening `index.html` directly through `file://` does not reproduce a hosted site
 
 - Select **Enter the village**; the game receives keyboard focus.
 - Use **WASD** or **arrow keys** to walk, and hold **Shift** to move faster.
-- Press **E** or **Space** near a door, NPC, sign, or object to open its context-specific actions.
+- Press **E**, **Enter**, or **Space** near a door, NPC, sign, or object to open its context-specific actions.
 - Press **Escape** or select **Menu** to pause. Escape also closes an open panel.
 - On touch screens, hold the directional buttons and select the interaction button near a usable object.
-- **Journal** tracks discovered field notes. Select **Read complete portfolio** to switch to the reading view, or open the complete portfolio from the title/pause screen without requiring exploration or battles.
+- **Journal** opens the mystery's pages, connected clues and current objective. **Portfolio** opens the complete professional reading view immediately. The pause menu also offers the optional **Discovery journal** for source records found through exploration.
 - **Village map** lists destinations and offers fast travel; houses in its overview are also keyboard accessible.
 - **Forge** configures the village or one selected interior, with manual/random valid codes, independent layout/decoration seeds, defaults, and versioned configuration import/export.
 - Select the name in the header, or the pause menu's return action, to return to the title screen.
 - **Résumé** downloads the original PDF. `portfolio.html` offers the complete conventional reading view and works without JavaScript.
 
-Movement stops while a panel is open. Leaving browser focus clears held controls. Diagonal movement is normalized, collisions use substeps to prevent passing through buildings at low frame rates, and the camera follows the explorer. Gameplay suppresses movement-key scrolling only while the game canvas receives input. Reduced-motion settings remove walking bob and camera easing.
+Movement stops while a panel is open. In menus, **WASD/arrows** navigate controls, **Enter/Space** activates them (including checkboxes), **Tab/Shift+Tab** cycles focus, and **Escape** closes the panel. Text fields, sliders and select controls retain their normal editing behavior. Leaving browser focus clears held controls. Diagonal movement is normalized, collisions use substeps to prevent passing through buildings at low frame rates, and the camera follows the explorer. Gameplay suppresses movement-key scrolling only while the game canvas receives input. Reduced-motion settings remove decorative motion and camera easing.
 
 ### A short exploration loop
 
@@ -89,13 +124,13 @@ The Guard holds position and advances when approached; the Skirmisher closes dis
 
 ### Saves and regeneration
 
-Exploration uses a **version 2 localStorage save** in the visitor's browser. It retains discoveries, visited houses, opened containers, one-time actions, inventory, quests, optional wins, position, and stored village/interior configurations. Interiors are reconstructed from configuration instead of saving a large map snapshot.
+Each exploration slot retains the existing **version 2 progress format**, wrapped by the **version 3 expedition save book**. It retains discoveries, visited houses, opened containers, one-time actions, inventory, quests, optional wins, position, stored village/interior configurations, mystery state, and encounter pacing. The save book stores expedition identities/seeds and audio/encounter preferences. Existing version 2 journeys are retained as a legacy slot. Interiors are reconstructed from configuration instead of saving a large map snapshot.
 
-Saves are local to that browser and origin; they are not uploaded to GitHub or synchronized between devices. Malformed or old-version saves start a fresh journey with a warning. If the source résumé's **PDF hash changes**, the save resets explicitly so old geometry and records are not applied to a new résumé. Normalized world generation can stay identical across PDF encoding-only changes, but save identity deliberately follows the source PDF hash.
+Saves are local to that browser and origin; they are not uploaded to GitHub or synchronized between devices. If the source résumé's **PDF hash changes**, the V3 session starts an updated résumé journey in a **separate slot**, preserving the previous saved text. If no slot is available, automatic writes are protected rather than overwriting the earlier journey. Malformed or incompatible save books show a warning and remain untouched in storage while automatic writes are disabled. Normalized world generation can stay identical across PDF encoding-only changes, but progress identity deliberately follows the source PDF hash.
 
 Changing generation settings preserves discoveries and rewards. Stable object/action IDs keep opened containers and one-time consequences from resetting when their visuals or positions change. A newly generated scene uses a valid spawn; returning to the village restores a safe exterior position. Generation configuration sharing and personal save progress are separate: importing a configuration does not import someone else's inventory or quest rewards.
 
-You can also **Export journey save** from the menu and restore that JSON using **Import a journey save**. Journey imports validate the résumé identity, procedural configurations and saved position before applying them.
+You can **Export journey save** from the menu or export every expedition together, then paste either valid journey JSON or a version 3 save book into the import control. Imports validate résumé identity, configurations and positions, and **append new slots** while preserving existing expeditions. Import is rejected if it would exceed the **12-slot limit**; it does not replace the current book silently.
 
 ## Update the résumé
 
@@ -220,7 +255,7 @@ Version 2 adds **19 passing action/progress/combat tests**: preconditions and fe
 
 The production validator checks deployed JSON references, regenerates the world for an exact comparison, compares the deployed PDF byte-for-byte with the source, verifies every fallback portfolio record/detail, confirms local sprite/font files, checks HTML/CSS references under a simulated repository subpath, and ensures one deployed PDF copy.
 
-See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for executed checks and [`docs/V2-CHANGES.md`](docs/V2-CHANGES.md) for the feature handoff. No browser preview or browser gameplay QA is claimed for this update; the user's request to skip previews was retained. Passing automated tests/builds are separate from a live deployment; hosting requires the Pages steps above.
+Version 3 additionally tests seeded encounter pacing/region protection, distinct duel patterns and command effects, safe terminal outcomes, audio setting bounds, gesture-only context creation, context replacement, volume/mute, bounded SFX, pause/visibility, failures, StrictMode manager reuse, and the actual nonempty distinct WAV files. Mystery/expedition tests validate mathematical puzzle answers, dependency chains, seed replay, save slots and related state. See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for final executed totals and [`docs/V3-CHANGES.md`](docs/V3-CHANGES.md) for this update. The historical [`docs/V2-CHANGES.md`](docs/V2-CHANGES.md) remains available. No browser preview, listening test, or browser gameplay QA is claimed here; passing automated tests/builds are separate from a live deployment.
 
 ## Troubleshooting and practical limits
 
@@ -232,11 +267,11 @@ See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for executed checks and [`doc
 - **A Pages deployment is skipped:** confirm the selected branch is the repository's default branch. Confirm Pages publishing source is GitHub Actions.
 - **Missing files or a blank deployed site:** confirm the source was uploaded at repository root, dotfolders were retained, and the Actions build uploaded `dist/`. Review the failed workflow step before rerunning it.
 - **A configuration is rejected:** check algorithm version 2, the target building ID, room count 2–10, exact sequence length, valid labels, and nonempty seeds. Village house count must match the current résumé.
-- **A save resets:** older save versions, malformed content, and changed source-PDF hashes are handled by starting a fresh journey with a message. Personal progress exists only in the current browser's local storage.
+- **A save cannot be restored:** incompatible or malformed books show a warning and protect the original stored text from automatic writes. Changed source-PDF hashes start a separate updated journey where space permits. Valid imports add slots; the 12-slot limit rejects an overflow rather than replacing earlier saves. Personal progress exists only in the current browser's local storage.
 - **An action is unavailable:** the menu explains required items or completed one-time actions. Inspect a chest for the clue to its key; there is no penalty for cancelling an interaction.
 - **Focus or movement is unavailable:** use highlighted reachable arena tiles; Focus needs a remaining charge, range, clear sight, and an unused action this turn. End turn resets the move/action allowance.
 
-The scope is deliberately compact: four interior archetypes, one discovery quest and one optional sparring goal, small inventory/cosmetic rewards, and three tactical opponent types. There is no large crafting tree, economy, or mandatory grind. The imported character sprite is a static front view with movement, facing mirroring, and a small walking bob; it is not a full directional animation set. Layouts prioritize readable, validated paths and can become wide or tall for unusually large résumés. Fast travel and the conventional portfolio remain available. No audio is required or included. Essential assets are local, but the application does not install an offline service worker. Mid-battle state is not saved; exploration progress and completed battle rewards are.
+The scope stays compact: four interior archetypes, six puzzle types, one connected main mystery, a few optional margins, simple command encounters, and retained optional tactical sparring. There is no large crafting tree, economy, or mandatory grind. Layouts prioritize validated paths and can become wide/tall for unusually large résumés. Fast travel and the complete portfolio remain available. Actual local music/effects are included; sound is not necessary for solving anything. No offline service worker is installed. Mid-battle state is not saved; completed outcomes and exploration progress are. Enemy battle art reuses existing sprites with restrained effects; it does not claim a separate newly authored animation sheet for every enemy.
 
 ## Source structure and artwork
 
@@ -249,13 +284,21 @@ src/core/interior.mjs       Semantic rooms, spatial layout and validation
 src/core/village.mjs        Reusable village object/action definitions
 src/core/progress.mjs       Discoveries, action rules, quests and versioned saves
 src/core/combat.mjs         Tactical turns, range, AI and outcome rewards
+src/core/duel.mjs           Fast command encounters and readable enemy patterns
+src/core/encounters.mjs     Seeded distance/region encounter pacing
+src/core/mystery.mjs        Authored clue chain, generated CS puzzles and journal state
+src/core/expeditions.mjs    Shareable seeds, preserved slots and save-book preferences
+src/core/session.mjs        Shared world/progress restoration path
+src/audio/audio.mjs         Gesture-gated central music/SFX manager
 src/game/                   Canvas renderer and movement/collision helpers
 src/components/             Semantic journal, links and modal UI
 public/assets/              Existing local sprite sheets, font and licenses
+public/audio/               Original music loops and short PCM sound effects
 tests/                      Node test suites
 .github/workflows/          Automatic static Pages deployment
 docs/VERIFICATION.md        Verification record
 docs/V2-CHANGES.md          Version 2 feature and usage handoff
+docs/V3-CHANGES.md          Version 3 mystery/encounter/audio handoff
 ```
 
 The sprite sheets are existing **Kenney** assets. The locally hosted pixel font is **Press Start 2P** by Cody Boisclair. No AI-generated artwork is included. Source URLs, original licenses, and atlas details are documented in [`ASSETS.md`](ASSETS.md), with license notices retained in `public/assets/`. Local files avoid fragile asset hotlinks. The game's visual concept takes inspiration from the requested reference while its content, layout, and interface are an original implementation.

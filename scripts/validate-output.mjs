@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { projectRoot, loadResumeConfig } from './extract-resume.mjs';
 import { validateResume, escapeHtml } from './normalize-resume.mjs';
 import { generateWorld } from '../src/core/world.mjs';
+import { MUSIC_CONTEXTS, SOUND_EFFECTS } from '../src/audio/audio.mjs';
 
 export function verifyRelativeAsset(reference, pagePath = 'index.html') {
   if (!reference || reference.startsWith('#') || /^(?:mailto|tel):/i.test(reference)) return null;
@@ -49,9 +50,15 @@ export async function validateOutput(root = projectRoot) {
     assert.ok(portfolio.includes(escapeHtml(entry.title)), `Fallback portfolio omits ${entry.id}.`);
     for (const detail of entry.details) assert.ok(portfolio.includes(escapeHtml(detail)), `Fallback portfolio omits a detail from ${entry.id}.`);
   }
-  for (const filename of ['tiny-town.png', 'tiny-dungeon.png', 'tiny-battle.png', 'roguelike-indoors.png', 'PressStart2P-Regular.ttf']) {
+  for (const filename of ['tiny-town.png', 'tiny-dungeon.png', 'tiny-battle.png', 'roguelike-indoors.png', 'explorer-actions.png', 'villager-actions.png', 'PressStart2P-Regular.ttf']) {
     const info = await stat(resolve(dist, 'assets', filename));
     assert.ok(info.size > 0, `Missing or empty local asset ${filename}.`);
+  }
+  for (const filename of [...MUSIC_CONTEXTS.map(name => `music-${name}.wav`), ...SOUND_EFFECTS.map(name => `sfx-${name}.wav`)]) {
+    const bytes = await readFile(resolve(dist, 'audio', filename));
+    assert.ok(bytes.length > 1000 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WAVE', `Missing or malformed deployed audio ${filename}.`);
+    assert.equal(bytes.readUInt16LE(20), 1, `Deployed audio ${filename} must be standard PCM WAV.`);
+    assert.equal(bytes.readUInt32LE(24), 16000, `Unexpected sample rate for deployed audio ${filename}.`);
   }
   const files = await allFiles(dist);
   for (const file of files.filter(file => /\.(?:html|css)$/.test(file))) {

@@ -2,6 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
+import "./game/game-v3.css";
+import "./components/battle-v3.css";
+import "./components/adventure-v3.css";
 
 const pixelFont = new FontFace('Pixel', `url(${import.meta.env.BASE_URL}assets/PressStart2P-Regular.ttf)`);
 pixelFont.load().then(font => document.fonts.add(font)).catch(() => { /* System monospace remains readable offline. */ });

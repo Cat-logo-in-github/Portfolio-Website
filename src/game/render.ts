@@ -1,10 +1,14 @@
 import type { GameObject, GameScene, Point } from "../types";
 import { decorationBounds } from "./physics.mjs";
+import { characterFrame, npcFrame } from './animation.mjs';
+import { characterTexture } from './character-texture.mjs';
 
 export type SpriteSheets = {
   town: HTMLImageElement;
   dungeon: HTMLImageElement;
   interior: HTMLImageElement;
+  player?: HTMLImageElement;
+  npc?: HTMLImageElement;
 };
 export type View = { left: number; top: number; width: number; height: number };
 const TILE = 16;
@@ -429,6 +433,8 @@ export function drawObject(
   unlockedIds: string[],
   openedIds: string[],
   view: View,
+  timeMs = 0,
+  reducedMotion = false,
 ) {
   if (
     !visible(
@@ -448,7 +454,10 @@ export function drawObject(
     ctx.fillStyle = "#171c2445";
     ctx.fillRect(object.x + 2, object.y + 2, object.width, object.height);
   }
-  if (object.sprite.sheet === "interior")
+  if (object.type === 'npc' && sheets.npc?.complete && sheets.npc.naturalWidth) {
+    const frame = npcFrame(object.id, timeMs, nearbyId === object.id, reducedMotion);
+    ctx.drawImage(sheets.npc, frame.x, frame.y, frame.width, frame.height, Math.round(object.x), Math.round(object.y), object.width, object.height);
+  } else if (object.sprite.sheet === "interior")
     furniture(ctx, object, sheets, opened);
   else {
     const index = object.type === "chest" && opened ? 92 : object.sprite.index;
@@ -468,6 +477,10 @@ export function drawObject(
   } else if (object.recordIds.length) {
     ctx.fillStyle = "#efd578";
     ctx.fillRect(object.x + object.width / 2 - 1, object.y - 5, 3, 3);
+  }
+  if (object.actions.some(action => ['puzzle', 'storyboss', 'storytravel', 'lore'].includes(action.kind))) {
+    const center = object.x + object.width / 2, offset = reducedMotion ? 0 : Math.round(Math.sin(timeMs / 300) * .75);
+    ctx.fillStyle = '#c7b5ff'; ctx.beginPath(); ctx.moveTo(center, object.y - 10 + offset); ctx.lineTo(center + 3, object.y - 7 + offset); ctx.lineTo(center, object.y - 4 + offset); ctx.lineTo(center - 3, object.y - 7 + offset); ctx.closePath(); ctx.fill();
   }
   if (object.id === nearbyId) {
     const target = object.interactAt;
@@ -495,16 +508,20 @@ export function drawPlayer(
   ctx: CanvasRenderingContext2D,
   sheets: SpriteSheets,
   point: Point,
-  direction: number,
-  bob: number,
+  facing: string,
+  state = 'idle',
+  elapsedMs = 0,
+  reducedMotion = false,
 ) {
   ctx.fillStyle = "#293c3266";
   ctx.beginPath();
   ctx.ellipse(point.x, point.y + 1, 6, 2, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.save();
-  ctx.translate(Math.round(point.x), Math.round(point.y - 12 + bob));
-  ctx.scale(direction, 1);
-  sprite(ctx, sheets.dungeon, 98, -8, -4);
-  ctx.restore();
+  const texture = characterTexture(sheets.player);
+  if (texture) {
+    const frame = characterFrame(state, facing, elapsedMs, reducedMotion);
+    ctx.drawImage(texture, frame.x, frame.y, frame.width, frame.height, Math.round(point.x - 8), Math.round(point.y - 15), 16, 16);
+  } else {
+    ctx.save(); ctx.translate(Math.round(point.x), Math.round(point.y - 12)); ctx.scale(facing === 'left' ? -1 : 1, 1); sprite(ctx, sheets.dungeon, 98, -8, -4); ctx.restore();
+  }
 }

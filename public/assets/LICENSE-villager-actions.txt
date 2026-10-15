@@ -1,0 +1,10 @@
+Villager idle, walking and working sprites
+Creator: dutzy
+Source: https://opengameart.org/content/man-sprite-16x16
+Original file: https://opengameart.org/sites/default/files/villager.png
+License declared by the creator: Creative Commons Zero (CC0 1.0)
+License terms: https://creativecommons.org/publicdomain/zero/1.0/
+Original inspiration/base acknowledged by the creator: russpuppy, Running Platform Guy
+Original base source: https://opengameart.org/content/running-platform-guy
+
+The PNG is included unchanged. This game uses the artist's existing blink and arm/working frames for NPC idle behaviors.

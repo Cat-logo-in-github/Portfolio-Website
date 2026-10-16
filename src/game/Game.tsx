@@ -1,21 +1,24 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { GameObject, GameScene, Point } from '../types';
-import { canStand, movementVector, movePlayer, nearestObject } from './physics.mjs';
+import { canStand, movementVector, movePlayer } from './physics.mjs';
+import { spawnCreatures, stepCreatures } from '../core/creatures.mjs';
+import { liveNearby, liveObject, liveObjects } from './live-interactions.mjs';
 import { canInteractWith, findWalkPath, objectAtPoint, sceneGeometryChanged } from './navigation.mjs';
 import { facingFromMovement } from './animation.mjs';
-import { drawInterior, drawObject, drawPlayer, drawVillage } from './render';
+import { drawCreature, drawInterior, drawObject, drawPlayer, drawVillage } from './render';
 import type { SpriteSheets } from './render';
 
-export type GameHandle = { focus: () => void; teleport: (point: Point) => void; getPosition: () => Point };
-type Props = { scene: GameScene; active: boolean; unlockedIds: string[]; openedIds: string[]; onInteract: (object: GameObject) => void; onPause: () => void; onNearby: (object: GameObject | null) => void; onPosition?: (point: Point) => void; onTravel?: (distance: number) => void; onStep?: () => void };
+export type GameHandle = { focus: () => void; teleport: (point: Point) => void; getPosition: () => Point; interactNearby: () => void };
+type Props = { scene: GameScene; active: boolean; unlockedIds: string[]; openedIds: string[]; creatureState?: Parameters<typeof spawnCreatures>[2] | null; creatureSeed?: string; creatureProfile?: string; onInteract: (object: GameObject) => void; onPause: () => void; onNearby: (object: GameObject | null) => void; onPosition?: (point: Point) => void; onTravel?: (distance: number, movementSeconds: number) => void; onStep?: () => void };
 
-const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlockedIds, openedIds, onInteract, onPause, onNearby, onPosition, onTravel, onStep }, ref) {
+const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlockedIds, openedIds, creatureState, creatureSeed = 'village-life', creatureProfile = 'calm', onInteract, onPause, onNearby, onPosition, onTravel, onStep }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null), player = useRef<Point>({ ...scene.spawn });
   const keys = useRef(new Set<string>()), touch = useRef({ x: 0, y: 0 });
   const route = useRef<Point[]>([]), routeTarget = useRef<string | null>(null), interactUntil = useRef(0);
   const view = useRef({ left: 0, top: 0, scale: 3 }), geometry = useRef(scene);
-  const latest = useRef({ scene, active, unlockedIds, openedIds, onInteract, onPause, onNearby, onPosition, onTravel, onStep });
-  latest.current = { scene, active, unlockedIds, openedIds, onInteract, onPause, onNearby, onPosition, onTravel, onStep };
+  const simulation = useRef<ReturnType<typeof spawnCreatures> | null>(null), creatureGeometry = useRef<GameScene | null>(null), population = useRef('');
+  const latest = useRef({ scene, active, unlockedIds, openedIds, creatureState, creatureSeed, creatureProfile, onInteract, onPause, onNearby, onPosition, onTravel, onStep });
+  latest.current = { scene, active, unlockedIds, openedIds, creatureState, creatureSeed, creatureProfile, onInteract, onPause, onNearby, onPosition, onTravel, onStep };
   const [assetError, setAssetError] = useState(false), [positionText, setPositionText] = useState(`Exploring ${scene.label}`), [nearbyObject, setNearbyObject] = useState<GameObject | null>(null);
   const focus = () => { if (latest.current.active && !document.querySelector('[role="dialog"][aria-modal="true"]')) canvas.current?.focus({ preventScroll: true }); };
   const teleport = (point: Point) => {
@@ -27,13 +30,21 @@ const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlock
     latest.current.onPosition?.({ ...player.current }); keys.current.clear(); touch.current = { x: 0, y: 0 }; route.current = []; routeTarget.current = null;
     interactUntil.current = performance.now() + 300; latest.current.onInteract(object);
   };
-  useImperativeHandle(ref, () => ({ focus, teleport, getPosition: () => ({ ...player.current }) }), []);
+  const interactNearby = () => { const object = liveNearby(player.current, latest.current.scene, simulation.current) as GameObject | null; if (object) activate(object); };
+  useImperativeHandle(ref, () => ({ focus, teleport, getPosition: () => ({ ...player.current }), interactNearby }), []);
   useEffect(() => {
     if (sceneGeometryChanged(geometry.current, scene) || !canStand(player.current, scene)) {
       teleport(scene.spawn); latest.current.onNearby(null); setNearbyObject(null); setPositionText(`Exploring ${scene.label}`);
     }
     geometry.current = scene;
   }, [scene]);
+  useEffect(() => {
+    const key = `${creatureSeed}:${creatureProfile}`;
+    if (!simulation.current || sceneGeometryChanged(creatureGeometry.current, scene) || key !== population.current) {
+      simulation.current = spawnCreatures(scene, creatureSeed, latest.current.creatureState || undefined, player.current, { profile: creatureProfile });
+      creatureGeometry.current = scene; population.current = key;
+    }
+  }, [scene, creatureSeed, creatureProfile]);
   useEffect(() => {
     if (!active) { keys.current.clear(); touch.current = { x: 0, y: 0 }; route.current = []; routeTarget.current = null; }
     else focus();
@@ -45,10 +56,11 @@ const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlock
     let disposed = false, frame = 0, previous = 0, width = 0, height = 0, ratio = 1, nearbyId = '', positionSent = 0, stepDistance = 0;
     let camera = { ...player.current }, facing = 'down', observedScene = latest.current.scene, wasMoving = false, animationState = 'idle', animationSince = 0;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const town = new Image(), dungeon = new Image(), interior = new Image(), playerSheet = new Image(), npc = new Image();
-    const sheets: SpriteSheets = { town, dungeon, interior, player: playerSheet, npc };
+    const town = new Image(), dungeon = new Image(), interior = new Image(), playerSheet = new Image(), npc = new Image(), battle = new Image();
+    const sheets: SpriteSheets = { town, dungeon, interior, player: playerSheet, npc, battle };
     town.src = `${import.meta.env.BASE_URL}assets/tiny-town.png`; dungeon.src = `${import.meta.env.BASE_URL}assets/tiny-dungeon.png`; interior.src = `${import.meta.env.BASE_URL}assets/roguelike-indoors.png`;
     playerSheet.src = `${import.meta.env.BASE_URL}assets/explorer-actions.png`; npc.src = `${import.meta.env.BASE_URL}assets/villager-actions.png`;
+    battle.src = `${import.meta.env.BASE_URL}assets/tiny-battle.png`;
     town.onerror = dungeon.onerror = () => { if (!disposed) setAssetError(true); };
     const resize = () => { const rect = element.getBoundingClientRect(); width = rect.width; height = rect.height; ratio = Math.min(window.devicePixelRatio || 1, 2); element.width = Math.round(width * ratio); element.height = Math.round(height * ratio); };
     const observer = new ResizeObserver(resize); observer.observe(element); resize();
@@ -61,7 +73,7 @@ const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlock
       const key = event.key.toLowerCase(), interaction = ['e', ' ', 'enter'].includes(key);
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'shift', ' ', 'enter', 'e', 'escape'].includes(key)) event.preventDefault();
       if (event.repeat && (interaction || key === 'escape')) return;
-      if (interaction) { const object = nearestObject(player.current, latest.current.scene) as GameObject | null; if (object) activate(object); }
+      if (interaction) interactNearby();
       else if (key === 'escape') { persist(); clear(); latest.current.onPause(); }
       else { keys.current.add(key); if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) { route.current = []; routeTarget.current = null; } }
     };
@@ -86,12 +98,14 @@ const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlock
         const traveled = Math.hypot(player.current.x - before.x, player.current.y - before.y); moving = traveled > 0.01;
         if (x || y) facing = facingFromMovement(x, y, facing);
         if (moving) {
-          state.onTravel?.(traveled); stepDistance += traveled;
+          const intended = Math.hypot(delta.x, delta.y);
+          state.onTravel?.(traveled, dt * Math.min(1, intended ? traveled / intended : 0)); stepDistance += traveled;
           if (stepDistance >= 14) { stepDistance %= 14; state.onStep?.(); }
         } else if (waypoint && dt > 0) { route.current = []; routeTarget.current = null; setPositionText('That route is blocked. Try a closer floor tile or use the arrows.'); }
-        const nearby = nearestObject(player.current, map) as GameObject | null;
+        simulation.current = stepCreatures(simulation.current, map, player.current, dt, state.creatureState, { profile: state.creatureProfile });
+        const nearby = liveNearby(player.current, map, simulation.current) as GameObject | null;
         if ((nearby?.id || '') !== nearbyId) { nearbyId = nearby?.id || ''; state.onNearby(nearby); setNearbyObject(nearby); setPositionText(nearby ? `Near ${nearby.label}. Press E, Enter or Space to interact.` : `Exploring ${map.label}`); }
-        if (!route.current.length && routeTarget.current) { const target = map.objects.find(object => object.id === routeTarget.current); routeTarget.current = null; if (target && canInteractWith(player.current, target, map)) activate(target); }
+        if (!route.current.length && routeTarget.current) { const target = liveObject(routeTarget.current, map, simulation.current) as GameObject | null; routeTarget.current = null; if (target && canInteractWith(player.current, target, map)) activate(target); }
         if ((moving && now - positionSent > 500) || (!moving && wasMoving)) { positionSent = now; state.onPosition?.({ ...player.current }); }
         wasMoving = moving;
       } else wasMoving = false;
@@ -106,10 +120,11 @@ const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlock
       ctx.setTransform(ratio * scale, 0, 0, ratio * scale, -left * ratio * scale, -top * ratio * scale); ctx.imageSmoothingEnabled = false;
       if (map.kind === 'interior') drawInterior(ctx, map, sheets, viewport); else drawVillage(ctx, map, sheets, viewport);
       if (route.current.length) { const destination = route.current.at(-1)!; ctx.strokeStyle = '#fff1b0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(destination.x, destination.y, 5, 3, 0, 0, Math.PI * 2); ctx.stroke(); }
-      const actors = map.objects.map(object => ({ depth: object.y + object.height, object })); let playerDrawn = false;
+      const actors = [...map.objects, ...liveObjects(map, simulation.current) as GameObject[]].map(object => ({ depth: object.y + object.height, object })); let playerDrawn = false;
       for (const actor of actors.sort((a, b) => a.depth - b.depth || a.object.id.localeCompare(b.object.id))) {
         if (!playerDrawn && actor.depth > player.current.y) { drawPlayer(ctx, sheets, player.current, facing, animationState, now - animationSince, reduced); playerDrawn = true; }
-        drawObject(ctx, actor.object, sheets, nearbyId, state.unlockedIds, state.openedIds, viewport, now, reduced);
+        if (actor.object.type === 'creature') drawCreature(ctx, actor.object, sheets, nearbyId, viewport, now, reduced);
+        else drawObject(ctx, actor.object, sheets, nearbyId, state.unlockedIds, state.openedIds, viewport, now, reduced, map.powered || map.palette === 'glitch-restored');
       }
       if (!playerDrawn) drawPlayer(ctx, sheets, player.current, facing, animationState, now - animationSince, reduced);
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); frame = requestAnimationFrame(render);
@@ -124,12 +139,13 @@ const Game = forwardRef<GameHandle, Props>(function Game({ scene, active, unlock
     if (!active || event.button > 0 || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
     focus(); const rect = event.currentTarget.getBoundingClientRect(), currentView = view.current;
     const point = { x: currentView.left + (event.clientX - rect.left) / currentView.scale, y: currentView.top + (event.clientY - rect.top) / currentView.scale }, map = latest.current.scene;
-    const target = objectAtPoint(point, map) as GameObject | null;
+    const target = objectAtPoint(point, { objects: [...map.objects, ...liveObjects(map, simulation.current)].filter(object => object.actions.length) }) as GameObject | null;
     if (target && canInteractWith(player.current, target, map)) { activate(target); return; }
     const path = findWalkPath(player.current, target?.interactAt || point, map) as Point[] | null;
     route.current = path || []; routeTarget.current = path && target ? target.id : null;
     setPositionText(path ? target ? `Walking to ${target.label}` : 'Following the marked route' : 'No clear route. Tap a closer floor tile or use WASD / arrows.');
   };
-  return <><canvas ref={canvas} role="img" aria-label={`Playable mystery RPG. ${positionText}. WASD or arrows move. E, Enter or Space interact. Click a floor tile to walk or an object to inspect. Escape opens the menu.`} tabIndex={active ? 0 : -1} onPointerDown={pointAt} /><span className="sr-only" aria-live="polite">{positionText}</span>{assetError && <div className="asset-error">The sprites couldn’t load. <a href="./portfolio.html">Read the portfolio</a> or open the journal.</div>}<div className={`touch-controls ${active ? '' : 'hidden'}`}><div className="dpad" aria-label="Movement controls">{[{ label: 'Move up', icon: '↑', x: 0, y: -1, name: 'up' }, { label: 'Move left', icon: '←', x: -1, y: 0, name: 'left' }, { label: 'Move down', icon: '↓', x: 0, y: 1, name: 'down' }, { label: 'Move right', icon: '→', x: 1, y: 0, name: 'right' }].map(d => <button type="button" key={d.name} className={d.name} aria-label={d.label} onPointerDown={event => hold(d.x, d.y, event)} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}>{d.icon}</button>)}</div><button type="button" className="touch-interact" disabled={!nearbyObject} aria-label={nearbyObject ? `Interact with ${nearbyObject.label}` : 'Approach an object to interact'} onClick={() => { const object = nearestObject(player.current, latest.current.scene) as GameObject | null; if (object) activate(object); }}><span className="touch-action-icon" aria-hidden="true">◇</span><span>{nearbyObject?.type === 'door' ? 'ENTER' : 'READ'}</span></button></div></>;
+  return <><canvas ref={canvas} role="img" aria-label={`Playable mystery RPG. ${positionText}. WASD or arrows move. E, Enter or Space interact. Click a floor tile to walk or an object to inspect. Escape opens the menu.`} tabIndex={active ? 0 : -1} onPointerDown={pointAt} /><span className="sr-only" aria-live="polite">{positionText}</span>{assetError && <div className="asset-error">The sprites couldn’t load. <a href="./portfolio.html">Read the portfolio</a> or open the journal.</div>}<div className={`touch-controls ${active ? '' : 'hidden'}`}><div className="dpad" aria-label="Movement controls">{[{ label: 'Move up', icon: '↑', x: 0, y: -1, name: 'up' }, { label: 'Move left', icon: '←', x: -1, y: 0, name: 'left' }, { label: 'Move down', icon: '↓', x: 0, y: 1, name: 'down' }, { label: 'Move right', icon: '→', x: 1, y: 0, name: 'right' }].map(d => <button type="button" key={d.name} className={d.name} aria-label={d.label} onPointerDown={event => hold(d.x, d.y, event)} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}>{d.icon}</button>)}</div><button type="button" className="touch-interact" disabled={!nearbyObject} aria-label={nearbyObject ? `Interact with ${nearbyObject.label}` : 'Approach an object to interact'} onClick={interactNearby}><span className="touch-action-icon" aria-hidden="true">◇</span><span>{nearbyObject?.type === 'door' ? 'ENTER' : 'READ'}</span></button></div></>;
 });
 export default Game;
+

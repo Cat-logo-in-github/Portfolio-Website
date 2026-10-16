@@ -8,7 +8,7 @@ class FakeContext {
   static instances = [];
   constructor() { this.currentTime = 1; this.destination = {}; this.state = 'suspended'; this.sources = []; this.gains = []; FakeContext.instances.push(this); }
   createGain() { const node = { gain: { value: 1, cancelScheduledValues() {}, setValueAtTime(value) { this.value = value; }, linearRampToValueAtTime(value) { this.value = value; } }, connect() {}, disconnect() {} }; this.gains.push(node); return node; }
-  createBufferSource() { const node = { loop: false, started: false, stopped: false, buffer: null, onended: null, connect() {}, disconnect() {}, start() { this.started = true; }, stop() { this.stopped = true; this.onended?.(); } }; this.sources.push(node); return node; }
+  createBufferSource() { const node = { loop: false, started: false, stopped: false, buffer: null, onended: null, connect() {}, disconnect() {}, start(when = 0, offset = 0) { this.started = true; this.offset = offset; }, stop() { this.stopped = true; this.onended?.(); } }; this.sources.push(node); return node; }
   async decodeAudioData() { return { duration: 7.68 }; }
   async resume() { this.state = 'running'; }
   async suspend() { this.state = 'suspended'; }
@@ -84,4 +84,33 @@ test('actual local tracks and effects are nonempty distinct PCM audio assets', a
   for (const name of SOUND_EFFECTS) {
     const bytes = await readFile(new URL(`../public/audio/sfx-${name}.wav`, import.meta.url)); assert.ok(bytes.length > 1000); assert.equal(bytes.toString('ascii', 8, 12), 'WAVE');
   }
+});
+
+test('long-form music resumes its place across scene changes and paused time', async () => {
+  const manager = make(); await manager.unlock(); const context = FakeContext.instances.at(-1);
+  context.currentTime = 4; await manager.setContext('interior');
+  context.currentTime = 5; await manager.setContext('village');
+  assert.equal(context.sources.at(-1).offset, 3, 'Village resumes the three seconds already played.');
+  context.currentTime = 7; await manager.suspend(); context.currentTime = 100;
+  await manager.unlock(); assert.equal(context.sources.at(-1).offset, 5, 'Paused time never advances the score.');
+  manager.dispose();
+});
+test('long-form decoded music cache remains bounded while keeping playback offsets', async () => {
+  const urls = [], manager = make({ fetcher: async url => { urls.push(url); return fetcher(); } });
+  await manager.unlock(); await manager.setContext('interior'); await manager.setContext('puzzle'); await manager.setContext('boss');
+  await manager.setContext('village');
+  assert.equal(urls.filter(url => url.endsWith('music-village.wav')).length, 2, 'Old decoded tracks are evicted instead of retaining the full album in memory.');
+  assert.equal(manager.getState().playing, 'village'); manager.dispose();
+});
+test('the shipped ambient score has full-length tracks with gentle unclipped boundaries', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../public/audio/music-manifest.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.tracks.length, MUSIC_CONTEXTS.length);
+  for (const track of manifest.tracks) {
+    assert.ok(track.seconds >= 96); assert.ok(track.peak <= .5); assert.ok(track.rms > .03 && track.rms < .25);
+    assert.ok(track.largestAdjacentStep < .04, 'Soft waves have no abrupt square-wave jumps.');
+    const bytes = await readFile(new URL(`../public/audio/music-${track.context}.wav`, import.meta.url));
+    assert.equal((bytes.length - 44) / 32000, track.seconds);
+    assert.ok(Math.abs(bytes.readInt16LE(44)) < 4); assert.ok(Math.abs(bytes.readInt16LE(bytes.length - 2)) < 4);
+  }
+  for (const name of ['village', 'interior', 'puzzle']) assert.ok(manifest.tracks.find(track => track.context === name).seconds >= 180);
 });

@@ -2,6 +2,8 @@ import type { GameObject, GameScene, Point } from "../types";
 import { decorationBounds } from "./physics.mjs";
 import { characterFrame, npcFrame } from './animation.mjs';
 import { characterTexture } from './character-texture.mjs';
+import { roadTiles, terrainQuarterTiles } from '../core/connections.mjs';
+import { roomComposition } from '../core/interior-style.mjs';
 
 export type SpriteSheets = {
   town: HTMLImageElement;
@@ -9,10 +11,21 @@ export type SpriteSheets = {
   interior: HTMLImageElement;
   player?: HTMLImageElement;
   npc?: HTMLImageElement;
+  battle?: HTMLImageElement;
 };
 export type View = { left: number; top: number; width: number; height: number };
 const TILE = 16;
 const interiorFloors = new WeakMap<GameScene, Map<string, string>>();
+const roadCache = new WeakMap<GameScene['paths'], {x:number;y:number;mask:number}[]>();
+const orientations = new WeakMap<GameScene, Map<string, string>>();
+
+function drawRoadTile(ctx: CanvasRenderingContext2D, town: HTMLImageElement, tile: {x:number;y:number;mask:number}) {
+  if (!town.complete || !town.naturalWidth) return;
+  terrainQuarterTiles(tile.mask).forEach((index, quadrant) => {
+    const x = quadrant % 2 * 8, y = Math.floor(quadrant / 2) * 8;
+    ctx.drawImage(town, index % 12 * 16 + x, Math.floor(index / 12) * 16 + y, 8, 8, tile.x + x, tile.y + y, 8, 8);
+  });
+}
 
 function sprite(
   ctx: CanvasRenderingContext2D,
@@ -94,35 +107,9 @@ export function drawVillage(
       );
     }
   }
-  for (const path of scene.paths) {
-    ctx.beginPath();
-    path.points.forEach((point, i) =>
-      i ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y),
-    );
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#849254";
-    ctx.lineWidth = 28;
-    ctx.stroke();
-    ctx.strokeStyle = "#d6ae75";
-    ctx.lineWidth = 22;
-    ctx.stroke();
-    for (let i = 1; i < path.points.length; i++) {
-      const a = path.points[i - 1],
-        b = path.points[i],
-        length = Math.hypot(b.x - a.x, b.y - a.y);
-      for (let d = 0; d <= length; d += 14) {
-        const t = length ? d / length : 0;
-        sprite(
-          ctx,
-          sheets.town,
-          25,
-          a.x + (b.x - a.x) * t - 8,
-          a.y + (b.y - a.y) * t - 8,
-        );
-      }
-    }
-  }
+  let roads = roadCache.get(scene.paths);
+  if (!roads) { roads = roadTiles(scene.paths); roadCache.set(scene.paths, roads); }
+  for (const tile of roads) if (visible(view, tile.x, tile.y)) drawRoadTile(ctx, sheets.town, tile);
   for (const decoration of scene.decorations || []) {
     const bounds = decorationBounds(decoration);
     if (!visible(view, bounds.x, bounds.y, bounds.width, bounds.height))
@@ -206,7 +193,7 @@ export function drawVillage(
       }
     label(
       ctx,
-      `${location.vertex} · ${location.label}`,
+      'secret' in location && location.secret ? location.label : `${location.vertex} · ${location.label}`,
       location.x + location.size.width / 2,
       location.y - 14,
     );
@@ -217,11 +204,16 @@ function floorMap(scene: GameScene) {
   const cached = interiorFloors.get(scene);
   if (cached) return cached;
   const floor = new Map<string, string>();
+  const directions = new Map<string, string>();
   for (const key of scene.floor || []) floor.set(key, "floor");
   // The generator's tiles use world pixels; its compact floor keys use tile coordinates.
   for (const tile of scene.tiles || [])
-    if (tile.kind !== "wall")
-      floor.set(`${tile.x / TILE},${tile.y / TILE}`, tile.kind);
+    if (tile.kind !== "wall") {
+      const key = `${tile.x / TILE},${tile.y / TILE}`;
+      floor.set(key, tile.kind);
+      if (tile.orientation) directions.set(key, tile.orientation);
+    }
+  orientations.set(scene, directions);
   interiorFloors.set(scene, floor);
   return floor;
 }
@@ -237,22 +229,21 @@ export function drawInterior(
     fromY = Math.floor(view.top / TILE) - 1;
   const maxX = Math.ceil((view.left + view.width) / TILE) + 1,
     maxY = Math.ceil((view.top + view.height) / TILE) + 1;
-  const stone =
-    scene.archetype === "arena" ||
-    scene.archetype === "guild" ||
-    scene.archetype === "workshop";
+  const stone = scene.archetype === 'arena' || scene.archetype === 'guild' || scene.archetype === 'workshop';
   for (let y = fromY; y < maxY; y++)
     for (let x = fromX; x < maxX; x++) {
       const key = `${x},${y}`,
         kind = floor.get(key),
         px = x * TILE,
         py = y * TILE;
+      const room = scene.rooms?.find(room => px >= room.x && py >= room.y && px < room.x + room.width && py < room.y + room.height);
+      const tileStone = room ? roomComposition(room.role).floor === 'stone' : stone;
       if (kind) {
         const hash = (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
         sprite(
           ctx,
           sheets.dungeon,
-          stone ? (hash % 11 === 0 ? 24 : 0) : hash % 19 === 0 ? 49 : 48,
+          tileStone ? (hash % 97 === 0 ? 24 : 0) : hash % 43 === 0 ? 49 : 48,
           px,
           py,
         );
@@ -261,11 +252,17 @@ export function drawInterior(
           ctx.fillRect(px, py, TILE, TILE);
         }
         if (kind === "door") {
-          ctx.fillStyle = "#d4aa6a";
-          ctx.fillRect(px, py + 7, TILE, 2);
-          ctx.fillStyle = "#745544";
-          ctx.fillRect(px, py, 2, TILE);
-          ctx.fillRect(px + 14, py, 2, TILE);
+        const horizontal = orientations.get(scene)?.get(key) !== 'vertical';
+        ctx.fillStyle = '#d4aa6a';
+        ctx.fillRect(px + (horizontal ? 0 : 7), py + (horizontal ? 7 : 0), horizontal ? TILE : 2, horizontal ? 2 : TILE);
+        ctx.fillStyle = '#745544';
+        if (horizontal) {
+          if (floor.get(`${x - 1},${y}`) !== 'door') ctx.fillRect(px, py, 2, TILE);
+          if (floor.get(`${x + 1},${y}`) !== 'door') ctx.fillRect(px + 14, py, 2, TILE);
+        } else {
+          if (floor.get(`${x},${y - 1}`) !== 'door') ctx.fillRect(px, py, TILE, 2);
+          if (floor.get(`${x},${y + 1}`) !== 'door') ctx.fillRect(px, py + 14, TILE, 2);
+        }
         }
       } else {
         const adjacent = [
@@ -298,12 +295,7 @@ export function drawInterior(
   for (const room of scene.rooms || []) {
     if (!visible(view, room.x, room.y, room.width, room.height)) continue;
     // A shallow rug in public rooms gives each function a recognizable focal area.
-    const color =
-      room.role.includes("reading") || room.role.includes("research")
-        ? "#526aa32d"
-        : room.role.includes("arena") || room.role.includes("spar")
-          ? "#a94f482d"
-          : "#9c705b20";
+    const style = roomComposition(room.role), restored = scene.palette === 'glitch-restored', color = restored ? '#83c99b34' : scene.powered ? '#e6bb6e30' : `${style.accent}25`;
     ctx.fillStyle = color;
     ctx.fillRect(
       room.x + 16,
@@ -311,7 +303,22 @@ export function drawInterior(
       Math.max(0, room.width - 32),
       Math.max(0, room.height - 32),
     );
-    label(ctx, room.label, room.x + room.width / 2, room.y - 7, "#e5d9be");
+    if (sheets.interior.complete && sheets.interior.naturalWidth && style.rug !== 'none') {
+      const first = style.rug === 'gold' ? 421 : 394, rugX = room.x + Math.floor(room.width / 32) * 16 - 16, rugY = room.y + Math.floor(room.height / 32) * 16;
+      for (let i = 0; i < 3; i++) sprite(ctx, sheets.interior, first + i, rugX + i * 16, rugY, 16, 16, 27, 1);
+    }
+    for (let x = room.x + 32; x < room.x + room.width - 24; x += 64) {
+      if (floor.has(`${x / 16},${room.y / 16 - 1}`)) continue;
+      const index = style.wall === 'tools' ? 118 : style.wall === 'window' ? 84 : style.wall === 'signal' ? 8 : 344;
+      const sheet = style.wall === 'signal' ? sheets.dungeon : style.wall === 'picture' ? sheets.interior : sheets.town;
+      sprite(ctx, sheet, index, x, room.y - 16, 16, 16, style.wall === 'picture' ? 27 : 12, style.wall === 'picture' ? 1 : 0);
+      if (style.wall === 'window') { ctx.fillStyle = '#f1d9a48c'; ctx.fillRect(x + 6, room.y - 11, 4, 5); }
+      if (scene.powered || restored) {
+        ctx.fillStyle = restored ? '#b9f4b9' : '#ffe6a2'; ctx.fillRect(x + 5, room.y - 10, 6, 3);
+        ctx.fillStyle = restored ? '#a0ed9c18' : '#ffdc8d18'; ctx.fillRect(x - 2, room.y, 20, 20);
+      }
+    }
+    label(ctx, room.label, room.x + room.width / 2, room.y - 28, restored ? '#bdf1c8' : scene.powered ? '#ffe4a9' : '#e5d9be');
   }
 }
 
@@ -435,6 +442,7 @@ export function drawObject(
   view: View,
   timeMs = 0,
   reducedMotion = false,
+  powered = false,
 ) {
   if (
     !visible(
@@ -450,11 +458,35 @@ export function drawObject(
     unlocked =
       object.recordIds.length > 0 &&
       object.recordIds.every((id) => unlockedIds.includes(id));
+  if (object.type === 'water-strip' || object.type === 'repaired-bridge') {
+    ctx.save(); ctx.beginPath(); ctx.rect(object.x, object.y, object.width, object.height); ctx.clip();
+    const firstX = Math.max(object.x, Math.floor(view.left / 16) * 16), lastX = Math.min(object.x + object.width, view.left + view.width + 16);
+    const firstY = Math.max(object.y, Math.floor(view.top / 16) * 16), lastY = Math.min(object.y + object.height, view.top + view.height + 16);
+    for (let y = firstY; y < lastY; y += 16) for (let x = firstX; x < lastX; x += 16) {
+      ctx.fillStyle = '#497f9c'; ctx.fillRect(x, y, Math.min(16, object.x + object.width - x), Math.min(16, object.y + object.height - y));
+      if (sheets.battle) sprite(ctx, sheets.battle, 37, x, y, 16, 16, 18);
+    }
+    if (object.type === 'repaired-bridge') {
+      const gap = object.solid ? 16 : 0;
+      for (let y = object.y; y < object.y + object.height; y += 8) {
+        if (gap && y >= object.y + object.height / 2 - gap / 2 && y < object.y + object.height / 2 + gap / 2) continue;
+        for (let x = object.x; x < object.x + object.width; x += 16) sprite(ctx, sheets.town, 45, x, y, 16, 8);
+      }
+      if (!object.solid) for (let y = object.y; y < object.y + object.height; y += 16) { sprite(ctx, sheets.town, 47, object.x - 2, y, 5, 16); sprite(ctx, sheets.town, 47, object.x + object.width - 3, y, 5, 16); }
+    }
+    ctx.restore(); return;
+  }
   if (object.solid) {
     ctx.fillStyle = "#171c2445";
     ctx.fillRect(object.x + 2, object.y + 2, object.width, object.height);
   }
-  if (object.type === 'npc' && sheets.npc?.complete && sheets.npc.naturalWidth) {
+  const lamplit = object.type === 'lamp' || object.parts?.some(part => part.sheet === 'interior' && part.index === 178);
+  if (lamplit || powered && object.type === 'computer') {
+    ctx.fillStyle = powered ? '#ffd8872e' : '#ffd88719'; ctx.beginPath(); ctx.ellipse(object.x + object.width / 2, object.y + object.height / 2, 24, 20, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  if (Array.isArray(object.parts) && object.parts.length) {
+    for (const part of object.parts as {sheet:'town'|'dungeon'|'interior';index:number;x:number;y:number;width?:number;height?:number}[]) sprite(ctx, sheets[part.sheet], part.index, object.x + part.x, object.y + part.y, part.width || 16, part.height || 16, part.sheet === 'interior' ? 27 : 12, part.sheet === 'interior' ? 1 : 0);
+  } else if (object.type === 'npc' && sheets.npc?.complete && sheets.npc.naturalWidth) {
     const frame = npcFrame(object.id, timeMs, nearbyId === object.id, reducedMotion);
     ctx.drawImage(sheets.npc, frame.x, frame.y, frame.width, frame.height, Math.round(object.x), Math.round(object.y), object.width, object.height);
   } else if (object.sprite.sheet === "interior")
@@ -471,6 +503,7 @@ export function drawObject(
       object.height,
     );
   }
+  if (powered && ['computer', 'editing-rack', 'researchdesk'].includes(object.type)) { ctx.fillStyle = '#b8f1b1'; ctx.fillRect(object.x + 4, object.y + 5, 6, 3); }
   if (unlocked || opened) {
     ctx.fillStyle = "#90d6ac";
     ctx.fillRect(object.x + object.width - 4, object.y - 4, 3, 3);
@@ -502,6 +535,21 @@ export function drawObject(
       "#ffe5a0",
     );
   }
+}
+
+/** Live fauna remain separate from the static scene's collision and geometry caches. */
+export function drawCreature(ctx: CanvasRenderingContext2D, object: GameObject, sheets: SpriteSheets, nearbyId: string, view: View, timeMs = 0, reducedMotion = false) {
+  if (!visible(view, object.x, object.y - 16, 16, 32)) return;
+  const entity = object.creatureEntity as {x:number;y:number;facing:string;behavior:string;species:string;rare?:boolean};
+  ctx.fillStyle = entity.rare ? '#eddc7045' : '#23392e55'; ctx.beginPath(); ctx.ellipse(entity.x, entity.y + 1, entity.rare ? 8 : 5, 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.translate(Math.round(entity.x), Math.round(entity.y - 16)); ctx.scale(entity.facing === 'left' ? -1 : 1, 1);
+  if (entity.species === 'caretaker' && sheets.npc?.complete && sheets.npc.naturalWidth) {
+    const frame = npcFrame(object.id, timeMs, nearbyId === object.id, reducedMotion);
+    ctx.drawImage(sheets.npc, frame.x, frame.y, frame.width, frame.height, -8, 0, 16, 16);
+  } else sprite(ctx, sheets.dungeon, object.sprite.index, -8, 0);
+  ctx.restore();
+  if (entity.behavior === 'follow' || entity.behavior === 'wait') { ctx.fillStyle = '#b8e9ca'; ctx.fillRect(entity.x - 1, entity.y - 19, 3, 3); }
+  if (nearbyId === object.id) { ctx.strokeStyle = '#ffe5a0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(entity.x, entity.y + 1, 8, 3, 0, 0, Math.PI * 2); ctx.stroke(); label(ctx, object.label, entity.x, entity.y - 25, '#ffe5a0'); }
 }
 
 export function drawPlayer(

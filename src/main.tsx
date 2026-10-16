@@ -15,3 +15,6 @@ class Boundary extends React.Component<{ children: React.ReactNode }, { failed: 
   render() { return this.state.failed ? <main className="error-page"><h1>The village couldn’t open.</h1><p>You can still read every section of the portfolio.</p><a href="./portfolio.html">Open portfolio</a><a href="./resume.pdf" download>Download résumé</a></main> : this.props.children; }
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><Boundary><App /></Boundary></React.StrictMode>);
+
+import './components/v4-world.css';
+import './components/v4-puzzles.css';

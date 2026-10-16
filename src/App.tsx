@@ -21,6 +21,12 @@ import ExpeditionPanel from "./components/ExpeditionPanel";
 import DialogueText from "./components/DialogueText";
 import EncounterBattle from "./components/EncounterBattle";
 import AudioSettings from "./components/AudioSettings";
+import { completedDeviceIds, solveDeviceProgress } from "./core/activity-progress.mjs";
+import DevicePanel from "./components/DevicePanel";
+import CreaturePanel from "./components/CreaturePanel";
+import { generateDevice } from "./core/devices.mjs";
+import { CREATURE_KEY, readCreatureState, saveCreatureState, creatureAction, restockCreatureFood } from "./core/creatures.mjs";
+import { GARDEN_ID, DEVICE_KEY, gardenVillage, gardenEntrance, gardenUnlocked, generateGarden, decorateAdventureScene } from "./core/destinations.mjs";
 import { createAudioManager } from "./audio/audio.mjs";
 import { travelEncounter } from "./core/encounters.mjs";
 import { createDuel } from "./core/duel.mjs";
@@ -53,6 +59,8 @@ type Panel =
   | "duel"
   | "audio"
   | "expeditions"
+  | "device"
+  | "creature"
   | null;
 
 const defaultVillageConfig = (world: World): VillageConfig => ({
@@ -147,7 +155,7 @@ function SceneOverview({
         >
           <rect x={node.x} y={node.y} width={node.width} height={node.height} />
           <text x={node.x + node.width / 2} y={node.y + node.height / 2 + 8}>
-            {node.vertex}
+            {node.vertex === 999 ? "?" : node.vertex}
           </text>
         </g>
       ))}
@@ -178,11 +186,15 @@ export default function App() {
   const [expeditionError, setExpeditionError] = useState("");
   const [puzzleId, setPuzzleId] = useState("");
   const [duel, setDuel] = useState<any>(null);
+  const [device, setDevice] = useState<any>(null);
+  const [creature, setCreature] = useState<any>(null);
+  const [creatureMessage, setCreatureMessage] = useState('');
   const bookRef = useRef<any>(null);
   const protectStoredBook = useRef(false);
   const trackerRef = useRef<any>(null);
   const sceneRef = useRef<GameScene | null>(null);
   const travelPending = useRef(0);
+  const walkingSeconds = useRef(0);
   const panelRef = useRef<Panel>(panel); panelRef.current = panel;
   const startedRef = useRef(started); startedRef.current = started;
   const audioManager = useMemo(() => createAudioManager({ baseURL: import.meta.env.BASE_URL }), []);
@@ -195,14 +207,18 @@ export default function App() {
   const interiorRef = useRef<GameScene | null>(null);
   interiorRef.current = interior;
   const village = useMemo(
-    () => (world ? (villageScene(world) as GameScene) : null),
+    () => (world ? (gardenVillage(world) as GameScene) : null),
     [world],
   );
   const plan = useMemo(() => resume && world && seed ? mysteryPlan(seed, resume, world) : null, [resume, world, seed]);
   const storyJSON = progress?.flags[STORY_KEY];
   const story: any = useMemo(() => resume && world && seed ? readMystery(typeof storyJSON === 'string' ? storyJSON : '', seed, resume, world) : null, [resume, world, seed, storyJSON]);
+  const deviceJSON = progress?.flags[DEVICE_KEY];
+  const completedDevices: string[] = useMemo(() => completedDeviceIds(deviceJSON), [deviceJSON]);
   const baseScene = interior || village;
-  const scene = useMemo(() => baseScene && plan && story ? decorateMysteryScene(baseScene, plan, story) as GameScene : baseScene, [baseScene, plan, story]);
+  const scene = useMemo(() => baseScene && plan && story ? decorateAdventureScene(baseScene, plan, story, { completed: completedDevices, gardenRestored: Boolean(progress?.flags['v4:garden-restored']) }) as GameScene : baseScene, [baseScene, plan, story, completedDevices, progress?.flags['v4:garden-restored']]);
+  const creatureJSON = progress?.flags[CREATURE_KEY];
+  const creatureState = useMemo(() => seed ? readCreatureState(typeof creatureJSON === 'string' ? creatureJSON : '', seed) : null, [seed, creatureJSON]);
   sceneRef.current = scene;
   const focusGame = useCallback(() => requestAnimationFrame(() => { if (panelRef.current === null && startedRef.current) game.current?.focus(); }), []);
 
@@ -264,7 +280,7 @@ export default function App() {
     }
   }, [progress]);
   useEffect(() => {
-    const context = panel === 'duel' ? duel?.status === 'victory' ? 'victory' : duel?.boss ? 'boss' : 'battle' : panel === 'battle' ? battle?.status === 'victory' ? 'victory' : 'battle' : panel === 'puzzle' ? 'puzzle' : panel === 'mystery' ? 'mystery' : interior ? 'interior' : 'village';
+    const context = panel === 'duel' ? duel?.status === 'victory' ? 'victory' : duel?.boss ? 'boss' : 'battle' : panel === 'battle' ? battle?.status === 'victory' ? 'victory' : 'battle' : ['puzzle', 'device'].includes(panel || '') ? 'puzzle' : panel === 'mystery' ? 'mystery' : interior ? 'interior' : 'village';
     if ((!started && panel !== 'audio') || panel === 'pause' || document.hidden) audioManager.suspend();
     else { void audioManager.unlock(); audioManager.setContext(context); }
     const visibility = () => { if (document.hidden) audioManager.suspend(); else if (startedRef.current && panelRef.current !== 'pause') { void audioManager.unlock(); audioManager.setContext(context); } };
@@ -285,7 +301,14 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast, started]);
 
+  const settleEncounter = useCallback(() => {
+    if (!trackerRef.current) return;
+    trackerRef.current = { ...trackerRef.current, sinceEncounter: 0, sinceEncounterSeconds: 0, checkDistance: 0, checkSeconds: 0, areaSeconds: 0 };
+    travelPending.current = 0; walkingSeconds.current = 0;
+    setProgress(p => p ? { ...p, flags: { ...p.flags, [ENCOUNTER_KEY]: JSON.stringify(trackerRef.current) } } : p);
+  }, []);
   const closePanel = useCallback(() => {
+    if (panel === "duel" || panel === "battle") settleEncounter();
     if (panel === "battle" && battle) {
       const final =
         battle.status === "active"
@@ -300,7 +323,7 @@ export default function App() {
     setObject(null);
     focusGame();
     if (panel === "duel") { setDuel(null); audioManager.effect("confirm"); }
-  }, [panel, battle, focusGame, audioManager]);
+  }, [panel, battle, focusGame, audioManager, settleEncounter]);
   const pause = useCallback(() => setPanel("pause"), []);
   const positionChanged = useCallback((point: Point) => {
     setProgress((p) =>
@@ -323,7 +346,7 @@ export default function App() {
     audioManager.effect("door");
     if (!world || !village || !interior) return;
     const state = progressRef.current!;
-    const house = world.locations.find((l) => l.id === interior.buildingId)!;
+    const house = world.locations.find((l) => l.id === interior.buildingId);
     const saved = {
       x: Number(state.flags["exterior:x"]),
       y: Number(state.flags["exterior:y"]),
@@ -333,7 +356,7 @@ export default function App() {
       Number.isFinite(saved.y) &&
       canStand(saved, village)
         ? saved
-        : house.entrance;
+        : house?.entrance || gardenEntrance(world);
     setInterior(null);
     setNearby(null);
     setProgress((p) =>
@@ -348,9 +371,17 @@ export default function App() {
     audioManager.effect("door");
     if (!resume || !world) return;
     const house = world.locations.find((l) => l.id === buildingId);
-    if (!house) return;
+    if (!house && buildingId !== GARDEN_ID) return;
     const state = stateOverride || progressRef.current!;
     try {
+      if (buildingId === GARDEN_ID) {
+        const currentStory = readMystery(String(state.flags[STORY_KEY] || ''), seed, resume, world);
+        if (!gardenUnlocked(currentStory)) { setToast('Restore the route tree and repair the bridge first.'); return; }
+        const next = generateGarden(resume, seed) as GameScene;
+        setProgress({ ...state, visited: [...new Set([...state.visited, GARDEN_ID])], position: { scene: 'interior', buildingId: GARDEN_ID, point: next.spawn }, flags: { ...state.flags, 'exterior:x': gardenEntrance(world).x, 'exterior:y': gardenEntrance(world).y } });
+        setInterior(next); setNearby(null); setObject(null); setPanel(null); initialPoint.current = null; focusGame(); return;
+      }
+      if (!house) return;
       const config =
         state.configs.interiors[house.id] ||
         ((bookRef.current && !activeSlot(bookRef.current).legacy ? expeditionInteriorConfig(resume, house, seed) : defaultInteriorConfig(resume, house)) as InteriorConfig);
@@ -376,7 +407,7 @@ export default function App() {
       setPanel(null);
       setObject(null);
       setToast(
-        `Entered ${house.label}. Approach a marked object and press E. Inspect gives a hint; the relevant action reveals its note.`,
+        `Entered ${house.label}.`,
       );
       focusGame();
     } catch (e) {
@@ -390,6 +421,11 @@ export default function App() {
   const execute = (target: GameObject, actionId: string) => {
     const declared = target.actions.find(action => action.id === actionId);
     audioManager.effect("interact");
+    if (declared?.kind === 'garden') { enter(GARDEN_ID); return; }
+    if (declared?.kind === 'creature') { setCreature(target.creatureEntity); setCreatureMessage(''); setPanel('creature'); return; }
+    if (declared?.kind === 'pantry' && creatureState) { const stocked = restockCreatureFood(creatureState); setProgress(p => p ? { ...p, flags: { ...p.flags, [CREATURE_KEY]: saveCreatureState(stocked.state) } } : p); setObjectMessage('Treat pouch filled. Observe a creature, then offer its favourite food.'); return; }
+    if (declared?.kind === 'garden-note') { setProgress(p => p ? { ...p, flags: { ...p.flags, 'v4:garden-note': true }, items: { ...p.items, 'moonseed-badge': 1 } } : p); setObjectMessage('“Leave room for the experiment that surprises you.” A moonseed badge joins your collection.'); return; }
+    if (declared?.kind === 'device') { setDevice({ ...generateDevice(seed, String(declared.deviceType), String(declared.siteId || interior?.buildingId || 'village'), bookRef.current?.preferences.profile || 'calm'), siteId: String(declared.siteId || interior?.buildingId || 'village') }); setPanel('device'); return; }
     if (declared?.kind === "puzzle") { setPuzzleId(String(declared.puzzleId)); setPanel("puzzle"); return; }
     if (declared?.kind === "encounter" && story) {
       const key = String(declared.encounterKey || target.id);
@@ -416,11 +452,7 @@ export default function App() {
     const questCompleted =
       state.quests.fieldTrip !== "complete" &&
       result.state.quests.fieldTrip === "complete";
-    setToast(
-      result.event === "discover"
-        ? `Field note discovered. You can read it here or in the journal.${questCompleted ? " Field trip complete! A field key is in your satchel." : ""}`
-        : result.message,
-    );
+    if (result.event === 'discover') setToast(questCompleted ? 'Field note discovered · field key earned.' : 'Field note discovered.');
     if (result.event === "enter")
       enter(result.buildingId!, result.state as unknown as Progress);
     else if (result.event === "exit") leave();
@@ -436,7 +468,7 @@ export default function App() {
     setObjectMessage("");
     if (
       target.actions.length === 1 &&
-      ["enter", "exit"].includes(target.actions[0].kind)
+      ["enter", "exit", "garden", "creature", "device"].includes(target.actions[0].kind)
     ) {
       execute(target, target.actions[0].id);
     } else setPanel("interaction");
@@ -445,6 +477,10 @@ export default function App() {
     void audioManager.unlock();
     setStarted(true);
     setPanel(null);
+    if (!progress?.flags['v4:onboarded']) {
+      setToast('WASD / arrows to walk. Click an object, or press E / Enter to use it.');
+      setProgress(p => p ? { ...p, flags: { ...p.flags, 'v4:onboarded': true } } : p);
+    }
     focusGame();
   };
   const travel = (house: Location) => {
@@ -460,6 +496,15 @@ export default function App() {
     );
     if (!leavingInterior)
       requestAnimationFrame(() => game.current?.teleport(house.entrance));
+    focusGame();
+  };
+  const travelGarden = () => {
+    if (!world || !gardenUnlocked(story)) { setToast('The Glitch Garden opens after the route tree and bridge are restored.'); return; }
+    const point = gardenEntrance(world); const changing = Boolean(interior);
+    setInterior(null); setNearby(null); setObject(null); setPanel(null); setStarted(true);
+    setProgress(p => p ? { ...p, position: { scene: 'village', point } } : p);
+    initialPoint.current = changing ? point : null;
+    if (!changing) requestAnimationFrame(() => game.current?.teleport(point));
     focusGame();
   };
   const openJournal = (id?: string, full = false) => {
@@ -570,7 +615,7 @@ export default function App() {
     if (!plan || !story) return { correct: false, message: 'The journal is not ready.' };
     const result = solveMystery(story, plan, puzzleId, submission);
     commitStory(result.state); audioManager.effect(result.correct ? 'puzzle' : 'interact');
-    if (result.correct) setToast('A clue clicks into place. The journal records where it leads next.');
+    if (result.correct) setToast(puzzleId === 'bridge-repair' ? 'Canal bridge restored · the Glitch Garden is open.' : 'Clue restored.');
     return result;
   };
   const openStoryPuzzle = (id: string) => {
@@ -580,6 +625,7 @@ export default function App() {
     else { const house = world?.locations.find(l => l.id === item.buildingId); if (house) travel(house); setToast(`Enter ${house?.label || 'the marked house'} and find ${item.title}.`); }
   };
   const duelChanged = (next: any) => {
+    if (next.status !== "active") settleEncounter();
     if (duel && next !== duel) {
       if (next.enemy.hp < duel.enemy.hp) audioManager.effect('attack');
       if (next.lastEvent === 'guard') audioManager.effect('guard');
@@ -598,14 +644,14 @@ export default function App() {
     audioManager.effect('win');
     setToast(next.boss ? 'The archive is restored. Open the journal to read the ending.' : next.rare ? 'A prismatic token joins your collection.' : 'A signal token joins your collection.');
   };
-  const walkDistance = useCallback((distance: number) => {
+  const walkDistance = useCallback((distance: number, movementSeconds = distance / 78) => {
     if (!startedRef.current || panelRef.current || !trackerRef.current || !bookRef.current?.preferences.encounters) return;
-    travelPending.current += distance;
+    travelPending.current += distance; walkingSeconds.current += movementSeconds;
     if (travelPending.current < 16) return;
     const map = sceneRef.current; if (!map) return;
     let knowledge: string[] = []; try { knowledge = JSON.parse(String(progressRef.current?.flags[STORY_KEY] || '{}')).solved || []; } catch { /* Fresh clues are safe. */ }
-    const result = travelEncounter(trackerRef.current, { distance: travelPending.current, sceneKind: map.kind, region: map.archetype || 'village', areaId: map.id, storyStage: knowledge.length, paused: false });
-    travelPending.current = 0; trackerRef.current = result.tracker;
+    const result = travelEncounter(trackerRef.current, { distance: travelPending.current, sceneKind: map.kind, region: map.archetype || 'village', areaId: map.id, movementSeconds: walkingSeconds.current, profile: bookRef.current?.preferences.profile || 'calm', storyStage: knowledge.length, paused: false });
+    travelPending.current = 0; walkingSeconds.current = 0; trackerRef.current = result.tracker;
     if (result.encounter) {
       const next = createDuel(result.encounter.id, result.encounter.opponent, { storyStage: knowledge.length, knowledge });
       next.enemy.name = result.encounter.title;
@@ -615,6 +661,18 @@ export default function App() {
       setDuel(encounterDuel); setPanel('duel'); audioManager.effect('encounter');
     }
   }, [audioManager]);
+  const submitDevice = (submission: any) => {
+    if (!device) return { correct: false, message: 'Choose a device.' };
+    const result = solveDeviceProgress(progressRef.current!, device, submission);
+    if (result.correct) { setProgress(result.state as unknown as Progress); audioManager.effect('puzzle'); }
+    return result;
+  };
+  const actWithCreature = (action: string) => {
+    if (!creature || !creatureState || !scene) return;
+    const result = creatureAction(creatureState, creature, action, { scene, player: game.current?.getPosition() || progress!.position.point, areaId: scene.id });
+    setProgress(p => p ? { ...p, flags: { ...p.flags, [CREATURE_KEY]: saveCreatureState(result.state) } } : p);
+    setCreatureMessage(result.message); audioManager.effect(action === 'feed' ? 'collect' : 'interact');
+  };
   const footstep = useCallback(() => audioManager.effect('footstep'), [audioManager]);
   const audioChanged = (settings: any) => {
     if (!bookRef.current) return;
@@ -626,7 +684,7 @@ export default function App() {
     if (!resume || !defaults.current) return;
     const slot = activeSlot(nextBook), session = buildSession(resume, defaults.current, slot);
     if (slot.save && session.requiresRecovery) throw Error('This earlier save needs recovery and has been preserved. Export the save book, then start a fresh expedition.');
-    bookRef.current = nextBook; setBook(nextBook); setSeed(slot.seed); trackerRef.current = session.tracker; travelPending.current = 0;
+    bookRef.current = nextBook; setBook(nextBook); setSeed(slot.seed); trackerRef.current = session.tracker; travelPending.current = 0; walkingSeconds.current = 0;
     audioManager.setSettings(nextBook.preferences.audio);
     setWorld(session.world as World); setInterior(session.interior as GameScene | null); setProgress(session.state as unknown as Progress); setNearby(null); setObject(null); setDuel(null); setBattle(null);
     initialPoint.current = session.point;
@@ -697,7 +755,7 @@ export default function App() {
             : panel === "quests"
               ? "Expedition notes"
               : panel === "battle"
-                ? "Friendly tactical sparring"
+                ? "Tactical sparring"
                 : "Take a breather";
 
   return (
@@ -715,17 +773,12 @@ export default function App() {
           <span className="identity-sprite" aria-hidden="true" />
           <span>
             <strong>{resume.name}</strong>
-            <small>A WORLD OF WORK · V3</small>
+            <small>A WORLD OF WORK · V4</small>
           </span>
         </a>
         <nav aria-label="Portfolio navigation">
           <button className="mystery-nav" onClick={() => setPanel("mystery")}>Journal</button>
           <button className="portfolio-nav" onClick={() => openJournal(undefined, true)}>Portfolio</button>
-          <button className="map-nav" onClick={() => setPanel("map")}>Village map</button>
-          <button className="code-nav" onClick={() => setPanel("code")}>
-            Forge
-          </button>
-          <button className="quest-nav" onClick={() => { void audioManager.unlock(); setPanel("audio"); }}>Sound</button>
           <a className="resume-link" href="./resume.pdf" download>
             Résumé ↓
           </a>
@@ -744,6 +797,9 @@ export default function App() {
           onPosition={positionChanged}
           onTravel={walkDistance}
           onStep={footstep}
+          creatureState={creatureState}
+          creatureSeed={seed}
+          creatureProfile={book?.preferences.profile || 'calm'}
         />
         {!started && (
           <div className="title-screen">
@@ -777,7 +833,7 @@ export default function App() {
               <span>
                 {world.locations.length} houses · {recordCount} field notes
               </span>
-              <span>Six devices. One missing room. Every seed tells the mystery.</span>
+              <span>Repair the bridge. Discover the Glitch Garden.</span>
             </div>
           </div>
         )}
@@ -809,7 +865,7 @@ export default function App() {
                 Ⅱ <span>Menu</span>
               </button>
             </div>
-            <aside className="mini-map">
+            <aside className="mini-map" aria-label="Area map">
               <SceneOverview scene={scene} tiny />
               <button onClick={() => setPanel("map")}>
                 {interior ? "Room map" : "Village map"} ↗
@@ -824,7 +880,7 @@ export default function App() {
                   <span>{nearby.label}</span>
                   <button
                     id="game-action-dispatch"
-                    onClick={() => interact(nearby)}
+                    onClick={() => game.current?.interactNearby()}
                   >
                     <kbd>E</kbd> {nearby.actions[0]?.label || "Interact"}
                   </button>
@@ -842,32 +898,20 @@ export default function App() {
           </div>
         )}
       </section>
-      <footer className="footer-bar">
-        <div>
-          <kbd>WASD</kbd> / <kbd>↑↓←→</kbd>
-          <span> wander</span>
-          <span className="footer-separator">·</span>
-          <kbd>E</kbd>
-          <span> / Enter interact</span>
-          <span className="footer-separator">·</span>
-          <kbd>ESC</kbd>
-          <span> menu</span>
-        </div>
-        <button onClick={() => setPanel("code")}>
-          Village + interior Prüfer codes ↗
-        </button>
-      </footer>
+      <footer className="footer-bar"><span>The Missing Room · {completedDevices.length} experiments restored</span><details className="controls-help"><summary>Controls</summary><p>Walk: WASD / arrows. Use: E / Enter, or click an object. Run: Shift. Menu: Escape. In panels: WASD / arrows move focus, Enter selects, Tab reaches text fields. Touch controls appear on touch devices.</p></details></footer>
       {panel && (
         <Modal
-          title={panel === "mystery" ? "The missing-room journal" : panel === "puzzle" ? "An in-world puzzle" : panel === "duel" ? "An encounter" : panel === "audio" ? "Sound settings" : panel === "expeditions" ? "Expeditions and seeds" : title}
+          title={panel === "device" ? device?.title || "A CS device" : panel === "creature" ? creature?.name || "A creature" : panel === "mystery" ? "The missing-room journal" : panel === "puzzle" ? "An in-world puzzle" : panel === "duel" ? "An encounter" : panel === "audio" ? "Sound settings" : panel === "expeditions" ? "Expeditions and seeds" : title}
           onClose={closePanel}
-          wide={["journal", "map", "code", "mystery", "puzzle", "duel", "expeditions"].includes(panel)}
+          wide={["journal", "map", "code", "mystery", "puzzle", "duel", "expeditions", "device"].includes(panel)}
         >
-          {panel === "mystery" && plan && story && <MysteryJournal plan={plan} state={story} onPuzzle={openStoryPuzzle} onTravel={(id: string) => { const house = world.locations.find(l => l.id === id); if (house) travel(house); }} />}
+          {panel === 'device' && device && <DevicePanel key={device.instanceId} device={device} completed={completedDevices.includes(device.challengeId)} onSubmit={submitDevice} onClose={closePanel} />}
+          {panel === 'creature' && creature && creatureState && <CreaturePanel creature={creature} state={creatureState} onAction={actWithCreature} message={creatureMessage} onClose={closePanel} />}
+          {panel === "mystery" && plan && story && <MysteryJournal plan={plan} state={story} gardenOpen={gardenUnlocked(story)} onGarden={travelGarden} onPuzzle={openStoryPuzzle} onTravel={(id: string) => { const house = world.locations.find(l => l.id === id); if (house) travel(house); }} />}
           {panel === "puzzle" && plan && story && <PuzzlePanel key={`${seed}:${puzzleId}`} puzzle={plan.puzzles.find((p: any) => p.id === puzzleId)} state={story} onSubmit={submitPuzzle} onClose={closePanel} />}
           {panel === "duel" && duel && <EncounterBattle battle={duel} onChange={duelChanged} onFinish={closePanel} />}
           {panel === "audio" && <AudioSettings manager={audioManager} onChange={audioChanged} />}
-          {panel === "expeditions" && book && <ExpeditionPanel book={book} summary={`${world.locations.length} houses, ${world.locations.filter(location => world.edges.filter(edge => edge.from === location.vertex || edge.to === location.vertex).length === 1).length} road ends to explore. Your first clue waits in ${world.locations.find(location => location.id === plan?.puzzles[0].buildingId)?.label || 'the marked library'}. Village layout: ${progress.configs.village?.layoutSeed || 'original résumé seed'}.`} error={expeditionError} onStart={newExpedition} onSwitch={switchExpedition} onExport={() => downloadJSON(bookRef.current, 'world-of-work-v3-expeditions.json')} />}
+          {panel === "expeditions" && book && <ExpeditionPanel book={book} summary={`${world.locations.length} houses, ${world.locations.filter(location => world.edges.filter(edge => edge.from === location.vertex || edge.to === location.vertex).length === 1).length} road ends to explore. Your first clue waits in ${world.locations.find(location => location.id === plan?.puzzles[0].buildingId)?.label || 'the marked library'}.`} error={expeditionError} onStart={newExpedition} onSwitch={switchExpedition} onExport={() => downloadJSON(bookRef.current, 'world-of-work-v4-expeditions.json')} />}
           {panel === "journal" && (
             <div className="journal">
               <nav className="journal-nav" aria-label="Résumé sections">
@@ -954,6 +998,7 @@ export default function App() {
                             l.entrance.y === point.y,
                         );
                         if (house) travel(house);
+                        else if (point.x === gardenEntrance(world).x && point.y === gardenEntrance(world).y) travelGarden();
                       }
                 }
               />
@@ -967,12 +1012,12 @@ export default function App() {
                     ))}
                   </div>
                   <div className="code-actions">
-                    <button
+                    {interior.buildingId !== GARDEN_ID && <button
                       className="button secondary"
                       onClick={() => setPanel("code")}
                     >
                       Configure these rooms
-                    </button>
+                    </button>}
                     <button className="button secondary" onClick={leave}>
                       Return to village
                     </button>
@@ -980,6 +1025,7 @@ export default function App() {
                 </>
               ) : (
                 <div className="map-destinations">
+                  <div><span className="map-number">?</span><strong>Glitch Garden</strong><button className="travel-link" disabled={!gardenUnlocked(story)} onClick={travelGarden}>{gardenUnlocked(story) ? 'Cross the restored bridge →' : 'Sealed · repair the bridge'}</button></div>
                   {world.locations.map((l) => (
                     <div key={l.id}>
                       <span className="map-number">{l.vertex}</span>
@@ -1004,7 +1050,7 @@ export default function App() {
                 defaultVillageConfig(defaults.current || world)
               }
               interiorConfigs={progress.configs.interiors}
-              initialBuilding={interior?.buildingId}
+              initialBuilding={interior?.buildingId === GARDEN_ID ? undefined : interior?.buildingId}
               onVillage={applyVillage}
               onInterior={applyInterior}
             />
@@ -1016,10 +1062,10 @@ export default function App() {
                 {interior ? interior.label : "VILLAGE"}
               </span>
               <h2>{object.label}</h2>
-              <p>{object.hint}</p>
+              {!objectMessage && <p>{object.hint}</p>}
               <div className="object-actions">
                 {object.actions.map((action) => {
-                  const condition = ["puzzle", "lore", "storyboss", "storytravel", "encounter"].includes(action.kind) ? { available: true, reason: "" } : evaluateAction(object, action, progress);
+                  const condition = ["puzzle", "lore", "storyboss", "storytravel", "encounter", "garden", "device", "creature", "pantry", "garden-note"].includes(action.kind) ? { available: true, reason: "" } : evaluateAction(object, action, progress);
                   return (
                     <div key={action.id}>
                       <button
@@ -1192,7 +1238,7 @@ export default function App() {
                             progress.position.point,
                         },
                       },
-                      "parshwa-world-v3-journey.json",
+                      "parshwa-world-v4-journey.json",
                     )
                   }
                 >
@@ -1229,9 +1275,14 @@ export default function App() {
               >
                 Return to the title screen
               </button>
+              <label className="exploration-profile">Exploration mood <select value={book?.preferences.profile || 'calm'} onChange={event => {
+                const next = { ...bookRef.current, preferences: { ...bookRef.current.preferences, profile: event.target.value } };
+                bookRef.current = next; setBook(next); travelPending.current = 0; walkingSeconds.current = 0;
+                try { if (!protectStoredBook.current) localStorage.setItem(SAVE_BOOK_KEY, serializeSaveBook(next)); } catch { /* Export remains available. */ }
+              }}><option value="calm">Calm · relaxed (~12 min between surprises)</option><option value="balanced">Balanced · occasional (~6 min)</option><option value="chaotic">Chaotic · lively (~2 min)</option></select></label>
               <label className="encounter-preference"><input type="checkbox" checked={book?.preferences.encounters !== false} onChange={event => {
                 const next = { ...bookRef.current, preferences: { ...bookRef.current.preferences, encounters: event.target.checked } };
-                bookRef.current = next; setBook(next); travelPending.current = 0;
+                bookRef.current = next; setBook(next); travelPending.current = 0; walkingSeconds.current = 0;
                 try { if (!protectStoredBook.current) localStorage.setItem(SAVE_BOOK_KEY, serializeSaveBook(next)); } catch { /* Export remains available. */ }
               }} />Surprise encounters while walking (the story guardian stays available)</label>
               <details className="reset-journey">

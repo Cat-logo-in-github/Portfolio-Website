@@ -4,6 +4,8 @@ import {
   hashString,
   seededRandom,
 } from "./world.mjs";
+import { connectionMask } from './connections.mjs';
+import { roomComposition, furnitureParts, featureLabel } from './interior-style.mjs';
 
 const TILE = 16;
 const VERSION = 2;
@@ -15,39 +17,22 @@ const REQUIRED = {
   workshop: "workshop",
   studio: "stage",
 };
-const ROLE_LABELS = {
-  foyer: "Entrance hall",
-  living: "Living room",
-  study: "Study",
-  bedroom: "Bedroom",
-  storage: "Storage",
-  reading: "Reading room",
-  catalog: "Catalog room",
-  research: "Research room",
-  archive: "Archive",
-  workshop: "Workshop",
-  assembly: "Assembly room",
-  stage: "Performance studio",
-  editing: "Editing suite",
-  rehearsal: "Rehearsal room",
-  greenroom: "Green room",
-};
 const ROOM_SIZES = {
-  foyer: [192, 144],
-  living: [208, 160],
-  study: [192, 160],
-  bedroom: [176, 144],
-  storage: [160, 144],
+  foyer: [192, 176],
+  living: [208, 192],
+  study: [192, 176],
+  bedroom: [176, 176],
+  storage: [160, 176],
   reading: [224, 176],
   catalog: [208, 176],
   research: [224, 176],
-  archive: [176, 160],
+  archive: [176, 176],
   workshop: [224, 176],
   assembly: [208, 176],
   stage: [224, 192],
   editing: [208, 176],
   rehearsal: [208, 176],
-  greenroom: [176, 144],
+  greenroom: [176, 176],
 };
 const key = (x, y) => `${x},${y}`;
 const tileAt = (point) =>
@@ -259,16 +244,19 @@ function semanticRooms(config, edges) {
         studio: "rehearsal",
       }[config.archetype];
   }
+  const roleTotals = new Map(); for (const role of roles.slice(1)) roleTotals.set(role, (roleTotals.get(role) || 0) + 1);
+  const roleSeen = new Map();
   return Array.from({ length: config.nodeCount }, (_, i) => {
     const vertex = i + 1,
       role = roles[vertex];
     const variation =
       (hashString(`${config.layoutSeed}:dimensions:${vertex}`) % 2) * TILE;
     const [width, height] = ROOM_SIZES[role];
+    roleSeen.set(role, (roleSeen.get(role) || 0) + 1);
     return {
       vertex,
       role,
-      label: ROLE_LABELS[role],
+      label: `${roomComposition(role).name}${roleTotals.get(role) > 1 ? ` ${roleSeen.get(role)}` : ''}`,
       x: 0,
       y: 0,
       width: width + variation,
@@ -286,8 +274,8 @@ function furnitureSlots(room) {
   const zones = [
     [1, cx - 2, 1, cy - 2],
     [cx + 2, cols - 2, 1, cy - 2],
-    [1, cx - 2, cy + 2, rows - 3],
-    [cx + 2, cols - 2, cy + 2, rows - 3],
+    [1, cx - 2, cy + 2, rows - 1],
+    [cx + 2, cols - 2, cy + 2, rows - 1],
   ];
   const slots = [];
   for (const [left, right, top, bottom] of zones)
@@ -442,9 +430,10 @@ function layoutRooms(rooms, edges, config, entries) {
   return { paths, bounds, assignments };
 }
 
-function rasterize(rooms, paths, bounds) {
+function rasterize(rooms, paths, bounds, entrance) {
   const roomFloor = new Set(),
     floorKinds = new Map();
+  const orientations = new Map();
   for (const room of rooms)
     for (let y = room.y / TILE; y < (room.y + room.height) / TILE; y++)
       for (let x = room.x / TILE; x < (room.x + room.width) / TILE; x++) {
@@ -492,8 +481,10 @@ function rasterize(rooms, paths, bounds) {
           [x, y + 1],
         ].some(([nx, ny]) => roomFloor.has(key(nx, ny)))
       )
-        floorKinds.set(tile, "door");
+        { floorKinds.set(tile, "door"); orientations.set(tile, roomFloor.has(key(x, y - 1)) || roomFloor.has(key(x, y + 1)) ? 'horizontal' : 'vertical'); }
     }
+  for (const tile of entrance.floor) floorKinds.set(tile, tile === tileAt({ x: entrance.door.x + 8, y: entrance.door.y + 8 }) ? 'door' : 'corridor');
+  orientations.set(tileAt({ x: entrance.door.x + 8, y: entrance.door.y + 8 }), entrance.door.orientation);
   const wall = new Set();
   for (const tile of floorKinds.keys()) {
     const [x, y] = tile.split(",").map(Number);
@@ -509,7 +500,7 @@ function rasterize(rooms, paths, bounds) {
   const tiles = [
     ...floor.map((tile) => {
       const [x, y] = tile.split(",").map(Number);
-      return { x: x * TILE, y: y * TILE, kind: floorKinds.get(tile) };
+      return { x: x * TILE, y: y * TILE, kind: floorKinds.get(tile), mask: connectionMask(floorKinds, x, y), ...(orientations.has(tile) ? { orientation: orientations.get(tile) } : {}) };
     }),
     ...[...wall].sort(sortKeys).map((tile) => {
       const [x, y] = tile.split(",").map(Number);
@@ -576,6 +567,7 @@ function baseObject(id, type, label, slot) {
     recordIds: [],
     hint: "Inspect",
     sprite,
+    parts: furnitureParts(type, hashString(id) % 3),
     actions: [],
   };
 }
@@ -666,34 +658,34 @@ function furnish(rooms, assignments, location, config) {
     const random = seededRandom(
       hashString(`${config.decorationSeed}:props:${room.vertex}`),
     );
-    const chosen = available[Math.floor(random() * available.length)];
-    if (chosen) {
-      const type =
-        room.role === "bedroom"
-          ? "bed"
-          : ["storage", "archive"].includes(room.role)
-            ? "chest"
-            : ["workshop", "assembly"].includes(room.role)
-              ? "workbench"
-              : ["reading", "catalog", "research"].includes(room.role)
-                ? "bookshelf"
-                : room.role === "editing"
-                  ? "computer"
-                  : random() < 0.5
-                    ? "lamp"
-                    : "table";
+    const style = roomComposition(room.role);
+    const shuffled = [...available].sort((a, b) => hashString(`${config.decorationSeed}:cluster:${room.vertex}:${a.index}`) - hashString(`${config.decorationSeed}:cluster:${room.vertex}:${b.index}`) || a.index - b.index);
+    const count = Math.min(shuffled.length, Math.max(1, style.density - used.size));
+    const placed = [...used].map(index => slots[index]);
+    const offset = Math.floor(random() * style.features.length);
+    const anchor = { foyer: 'arrival-bench', bedroom: 'bed', reading: 'reading-nook', catalog: 'archive-stack', research: 'researchdesk', archive: 'archive-stack', workshop: 'workbench', assembly: 'workbench', stage: 'music-corner', editing: 'computer', rehearsal: 'music-corner', greenroom: 'arrival-bench', living: 'reading-nook', study: 'desk', storage: 'parts-rack' }[room.role] || style.features[0];
+    for (let i = 0; i < count; i++) {
+      // Spread independent clusters around the usable perimeter; keep the central cross open.
+      let best = 0;
+      if (placed.length) for (let index = 1; index < shuffled.length; index++) {
+        const score = candidate => Math.min(...placed.map(other => (candidate.slot.x - other.x) ** 2 + (candidate.slot.y - other.y) ** 2));
+        if (score(shuffled[index]) > score(shuffled[best])) best = index;
+      }
+      const chosen = shuffled.splice(best, 1)[0]; placed.push(chosen.slot);
+      const alternatives = style.features.filter(type => type !== anchor);
+      const type = i === 0 ? anchor : alternatives[(offset + i - 1) % alternatives.length] || anchor;
       const object = baseObject(
-        `${location.id}:furniture:${room.vertex}`,
+        `${location.id}:furniture:${room.vertex}:${i}`,
         type,
-        `${room.label} ${type === "bookshelf" ? "shelf" : type}`,
+        featureLabel(type),
         chosen.slot,
       );
       object.actions = [
         {
           id: "inspect",
-          label: "Inspect furnishings",
+          label: "Inspect",
           kind: "inspect",
-          message: `${room.label}: a clear central aisle links the doorways. These ${type === "bookshelf" ? "shelves belong" : "furnishings belong"} to the ${config.archetype}.`,
+          message: style.story,
         },
       ];
       objects.push(object);
@@ -923,6 +915,13 @@ export function validateInterior(interior) {
     )
   )
     throw new Error("The building exit is missing or inaccessible.");
+  const entry = interior.entrance, foyer = interior.rooms.find(room => room.vertex === entry?.room);
+  const exitObject = interior.objects.find(object => object.actions.some(action => action.kind === 'exit'));
+  if (!entry || !foyer || entry.side !== 'north' || entry.door.y + TILE !== foyer.y || entry.door.x < foyer.x || entry.door.x + TILE > foyer.x + foyer.width
+    || entry.door.x + 8 !== interior.exit.x || entry.door.y + 8 !== interior.exit.y || exitObject.x !== entry.door.x || exitObject.y !== entry.door.y
+    || !reached.has(tileAt(entry.inside)) || !reached.has(tileAt(entry.outside)) || !pointIn(entry.inside, foyer) || pointIn(interior.exit, foyer)) {
+    throw new Error('The exit must align with an open room boundary and clear floor on both sides.');
+  }
   for (const [index, path] of interior.paths.entries()) {
     const edge = interior.edges[index];
     if (
@@ -956,6 +955,7 @@ export function validateInterior(interior) {
   }
   // Remove room interiors: each remaining corridor component must join exactly one requested edge.
   const remaining = new Set([...floor].filter((tile) => !roomTiles.has(tile)));
+  for (const tile of interior.entrance?.floor || []) remaining.delete(tile);
   const physicalEdges = [];
   while (remaining.size) {
     const first = remaining.values().next().value,
@@ -1010,14 +1010,15 @@ export function generateInterior(resume, location, requestedConfig) {
     config,
     entries,
   );
-  const { floor, tiles } = rasterize(rooms, paths, bounds);
-  const objects = furnish(rooms, assignments, location, config);
   const foyer = rooms[0];
   const exit = {
     x: foyer.x + Math.floor(foyer.width / TILE / 2) * TILE + 8,
-    y: foyer.y + foyer.height - 24,
+    y: foyer.y - 8,
   };
-  const spawn = { x: exit.x, y: exit.y - 48 };
+  const entrance = { room: foyer.vertex, side: 'north', inside: { x: exit.x, y: foyer.y + 8 }, outside: { x: exit.x, y: foyer.y - 24 }, door: { x: exit.x - 8, y: foyer.y - 16, width: 16, height: 16, orientation: 'horizontal' }, floor: [tileAt(exit), tileAt({ x: exit.x, y: foyer.y - 24 })] };
+  const spawn = { x: exit.x, y: foyer.y + 24 };
+  const { floor, tiles } = rasterize(rooms, paths, bounds, entrance);
+  const objects = furnish(rooms, assignments, location, config);
   objects.push({
     id: `${location.id}:exit`,
     type: "door",
@@ -1028,7 +1029,7 @@ export function generateInterior(resume, location, requestedConfig) {
     height: 16,
     solid: false,
     range: 40,
-    interactAt: { x: exit.x, y: exit.y - 16 },
+    interactAt: { ...entrance.inside },
     recordIds: [],
     hint: "Leave building",
     sprite: { sheet: "town", index: 74 },
@@ -1042,6 +1043,8 @@ export function generateInterior(resume, location, requestedConfig) {
     archetype: config.archetype,
     config,
     algorithmVersion: VERSION,
+    geometryVersion: 4,
+    entrance,
     bounds,
     spawn,
     exit,

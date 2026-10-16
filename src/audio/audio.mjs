@@ -15,7 +15,7 @@ export function createAudioManager(options = {}) {
   let settings = normalizeAudioSettings(options.settings), context = null, master = null, musicGain = null, sfxGain = null;
   let desired = 'village', current = null, fading = null, ready = false, disposed = false, suspended = false, visibilitySuspended = false;
   let generation = 0, epoch = 0, requested = '', lastError = '';
-  const cache = new Map(), sfx = new Set(), lastEffect = new Map();
+  const cache = new Map(), sfx = new Set(), lastEffect = new Map(), musicPositions = new Map();
   const now = () => context?.currentTime || 0;
   const gain = (node, value, fade = .04) => {
     if (!node?.gain) return;
@@ -24,12 +24,18 @@ export function createAudioManager(options = {}) {
   const applySettings = () => { gain(master, settings.muted ? 0 : settings.master); gain(musicGain, settings.music); gain(sfxGain, settings.sfx); };
   const stopVoice = (voice, fade = 0) => {
     if (!voice) return;
+    if (voice.name && !voice.stopped && voice.duration > 0) {
+      musicPositions.set(voice.name, (voice.offset + Math.max(0, now() - voice.startedAt)) % voice.duration);
+      voice.stopped = true;
+    }
     try { if (fade) gain(voice.node, 0, fade); voice.source.stop(now() + fade); } catch { /* A source may already have ended. */ }
     if (!fade) { try { voice.source.disconnect?.(); voice.node?.disconnect?.(); } catch {} }
   };
   async function buffer(name, music) {
     const filename = `${music ? 'music' : 'sfx'}-${name}.wav`;
-    if (cache.has(filename)) return cache.get(filename);
+    if (cache.has(filename)) {
+      const value = cache.get(filename); cache.delete(filename); cache.set(filename, value); return value;
+    }
     const promise = (async () => {
       try {
         const response = await fetcher(`${baseURL}audio/${filename}`);
@@ -39,7 +45,13 @@ export function createAudioManager(options = {}) {
         return await context.decodeAudioData(bytes.slice(0));
       } catch (error) { lastError = error?.message || 'Audio is unavailable.'; return null; }
     })();
-    cache.set(filename, promise); return promise;
+    cache.set(filename, promise);
+    // Long-form tracks decode to larger buffers. Keep only two music assets cached.
+    if (music) for (const key of [...cache.keys()].filter(key => key.startsWith('music-'))) {
+      if ([...cache.keys()].filter(key => key.startsWith('music-')).length <= 2) break;
+      if (key !== filename && key !== `music-${current?.name}.wav`) cache.delete(key);
+    }
+    return promise;
   }
   async function playMusic() {
     if (!ready || disposed || suspended || visibilitySuspended || !context) return;
@@ -48,13 +60,15 @@ export function createAudioManager(options = {}) {
     const decoded = await buffer(target, true);
     if (token !== generation || disposed || suspended || visibilitySuspended || !decoded || !context) { if (token === generation) requested = ''; return; }
     stopVoice(fading); fading = current;
-    if (fading) stopVoice(fading, .18);
+    if (fading) stopVoice(fading, .75);
     try {
       const source = context.createBufferSource(), node = context.createGain();
       source.buffer = decoded; source.loop = true; node.gain.value = 0; source.connect(node); node.connect(musicGain);
-      const voice = { source, node, name: target };
+      const duration = Number.isFinite(decoded.duration) && decoded.duration > 0 ? decoded.duration : 0;
+      const offset = duration ? (musicPositions.get(target) || 0) % duration : 0;
+      const voice = { source, node, name: target, duration, offset, startedAt: now(), stopped: false };
       source.onended = () => { if (fading === voice) fading = null; try { source.disconnect?.(); node.disconnect?.(); } catch {} };
-      current = voice; requested = ''; source.start(); gain(node, 1, .18);
+      current = voice; requested = ''; source.start(0, offset); gain(node, 1, .75);
     } catch (error) { requested = ''; lastError = error?.message || 'Audio playback is unavailable.'; }
   }
   const stopMusic = () => { generation++; requested = ''; stopVoice(current); stopVoice(fading); current = null; fading = null; };
@@ -110,7 +124,7 @@ export function createAudioManager(options = {}) {
     getSettings() { return { ...settings }; },
     getState() { return { ready, suspended: suspended || visibilitySuspended, context: desired, playing: current?.name || null, activeEffects: sfx.size, lastError, disposed }; },
     suspend() { suspended = true; stopMusic(); stopEffects(); if (context) return Promise.resolve(context.suspend?.()).catch(() => {}); return Promise.resolve(); },
-    dispose() { if (disposed) return; epoch++; disposed = true; ready = false; stopMusic(); stopEffects(); cache.clear(); lastEffect.clear(); documentRef?.removeEventListener?.('visibilitychange', visibility); if (context) Promise.resolve(context.close?.()).catch(() => {}); context = null; master = null; musicGain = null; sfxGain = null; }
+    dispose() { if (disposed) return; epoch++; disposed = true; ready = false; stopMusic(); stopEffects(); cache.clear(); lastEffect.clear(); musicPositions.clear(); documentRef?.removeEventListener?.('visibilitychange', visibility); if (context) Promise.resolve(context.close?.()).catch(() => {}); context = null; master = null; musicGain = null; sfxGain = null; }
   };
 }
 

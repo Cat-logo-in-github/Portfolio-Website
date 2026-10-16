@@ -5,7 +5,8 @@ import { loadProgress } from './progress.mjs';
 import { canStand } from '../game/physics.mjs';
 import { expeditionVillageConfig, expeditionInteriorConfig } from './expeditions.mjs';
 import { mysteryPlan, createMystery, validateMysteryPlan, decorateMysteryScene, finishMysteryBoss } from './mystery.mjs';
-import { createEncounterTracker } from './encounters.mjs';
+import { createEncounterTracker, normalizeEncounterTracker } from './encounters.mjs';
+import { gardenVillage, generateGarden, gardenUnlocked, decorateAdventureScene, GARDEN_ID } from './destinations.mjs';
 
 export const STORY_KEY = 'v3:mystery';
 export const ENCOUNTER_KEY = 'v3:encounters';
@@ -37,8 +38,7 @@ export function readMystery(json, seed, resume, world) {
 }
 
 export function restoreTracker(json, seed) {
-  try { const tracker = JSON.parse(json || 'null'); if (tracker?.version === 3 && tracker.seed === seed && ['travelled', 'sinceEncounter', 'checkDistance', 'checks', 'encounters'].every(k => Number.isFinite(tracker[k]) && tracker[k] >= 0) && ['checks', 'encounters'].every(k => Number.isSafeInteger(tracker[k])) && (tracker.regionDistance === undefined || Number.isFinite(tracker.regionDistance) && tracker.regionDistance >= 0)) return { ...createEncounterTracker(seed), ...tracker }; } catch { /* Fresh pacing state is safe. */ }
-  return createEncounterTracker(seed);
+  try { return normalizeEncounterTracker(JSON.parse(json || 'null'), seed); } catch { return createEncounterTracker(seed); }
 }
 
 /** One session path is shared by initial load, slot switching, and seed replay. */
@@ -56,20 +56,24 @@ export function buildSession(resume, defaultWorld, slot) {
     catch { delete state.configs.interiors[id]; warnings.push('An incompatible interior configuration was reset; discoveries were retained.'); }
   }
   if (!slot.legacy) for (const location of world.locations) state.configs.interiors[location.id] ||= expeditionInteriorConfig(resume, location, slot.seed);
+  const plan = mysteryPlan(slot.seed, resume, world); validateMysteryPlan(plan, world);
+  const mystery = readMystery(state.flags[STORY_KEY], slot.seed, resume, world);
   let interior = null;
   if (state.position.scene === 'interior') {
+    if (state.position.buildingId === GARDEN_ID) {
+      if (gardenUnlocked(mystery)) interior = generateGarden(resume, slot.seed);
+      else warnings.push('The Glitch Garden is sealed. Your position was returned to the village.');
+    }
     const location = world.locations.find(l => l.id === state.position.buildingId);
     if (location) {
       const config = state.configs.interiors[location.id] || (slot.legacy ? defaultInteriorConfig(resume, location) : expeditionInteriorConfig(resume, location, slot.seed));
       state.configs.interiors[location.id] = config; interior = generateInterior(resume, location, config);
     }
   }
-  const base = interior || villageScene(world);
-  const plan = mysteryPlan(slot.seed, resume, world); validateMysteryPlan(plan, world);
-  const mystery = readMystery(state.flags[STORY_KEY], slot.seed, resume, world);
+  const base = interior || gardenVillage(world);
   // Always place devices from the canonical spawn, then validate the saved feet.
   // Moving the spawn to the saved position would change seeded prop placement.
-  const scene = decorateMysteryScene(base, plan, mystery);
+  const scene = decorateAdventureScene(base, plan, mystery);
   const point = canStand(state.position.point, scene) ? state.position.point : scene.spawn;
   if (point !== state.position.point && slot.save) warnings.push('Your position was moved to a safe entrance; every discovery was retained.');
   state.position = { scene: scene.kind, ...(interior ? { buildingId: interior.buildingId } : {}), point };
@@ -80,8 +84,9 @@ export function buildSession(resume, defaultWorld, slot) {
     const location = world.locations.find(value => value.id === id);
     const config = state.configs.interiors[id] || (slot.legacy ? defaultInteriorConfig(resume, location) : expeditionInteriorConfig(resume, location, slot.seed));
     const target = interior?.buildingId === id ? interior : generateInterior(resume, location, config);
-    decorateMysteryScene(target, plan, mystery); decorateMysteryScene(target, plan, ready);
+    decorateAdventureScene(target, plan, mystery); decorateAdventureScene(target, plan, ready);
   }
+  decorateAdventureScene(generateGarden(resume, slot.seed), plan, ready);
   const tracker = restoreTracker(state.flags[ENCOUNTER_KEY], slot.seed);
   state.flags[STORY_KEY] = JSON.stringify(mystery); state.flags[ENCOUNTER_KEY] = JSON.stringify(tracker); state.flags['v3:seed'] = slot.seed;
   return { world, state, interior, point, mystery, plan, tracker, requiresRecovery: Boolean(loaded.warning), warning: [...new Set(warnings)].join(' ') };

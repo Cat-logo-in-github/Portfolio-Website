@@ -109,6 +109,8 @@ export function mysteryPlan(seed, resume, world) {
     { id: 'stage-direction', title: 'A stage direction for tomorrow', text: 'A rehearsal script ends with: “Enter, uncertain. Stay anyway.” The last page has been left blank on purpose.', requires: [], buildingId: theatre, optional: true },
     { id: 'ending', title: 'Room for What Comes Next', text: 'You do not destroy the Quiet Indexer. You give it a new rule: unfinished does not mean unwanted. It restores the archive to every map and becomes its first curious reader. The missing room was never empty; it was waiting for permission to matter.', requires: MAIN, buildingId: research },
   ];
+  const bridgeClue = puzzles.find(puzzle => puzzle.id === 'bridge-repair');
+  if (bridgeClue) bridgeClue.reward.text += ' The canal crossing is restored: the Glitch Garden greenhouse south of the village is now open.';
   const plan = { version: 3, seed, title: 'The Missing Room', summary: 'An authored mystery with seeded clues, six playable CS puzzles, and room for unfinished ideas.', opening: pages[0].text, puzzles, pages, locations: world.locations.map(({ id, label, type }) => ({ id, label, type })), boss: { id: 'quiet-indexer', title: 'The Quiet Indexer', buildingId: research, prerequisites: [...MAIN], description: 'A guardian that learned the rules but forgot their purpose. Use the restored clues; retreat and retry keep every discovery.' }, ending: { title: 'Room for What Comes Next', text: pages.at(-1).text, bonus: 'The spare chair and all three margin notes join the archive. Its new catalog begins: “Questions welcome. Sensible folding optional.”', requiresBoss: true } };
   validateMysteryPlan(plan, world); return plan;
 }
@@ -269,24 +271,27 @@ export function decorateMysteryScene(scene, plan, state) {
     if (plan.boss.buildingId === scene.buildingId) {
       definitions.push({ id: 'mystery:boss', type: 'npc', label: plan.boss.title, hint: state.ending ? 'The archive is restored' : MAIN.every((id) => state.solved.includes(id)) ? 'The final archive protocol awaits' : 'The guardian waits for five restored clues', sprite: { sheet: 'dungeon', index: 92 }, actions: [{ id: 'guardian', label: state.ending ? 'Revisit the ending' : 'Speak to the archive guardian', kind: state.ending ? 'lore' : 'storyboss', ...(state.ending ? { pageId: 'ending' } : {}), prerequisites: [...MAIN] }] });
     }
-    if (scene.buildingId !== plan.boss.buildingId) {
-      const open = state.solved.includes('room-tree') && state.solved.includes('bridge-repair');
-      definitions.push({ id: 'mystery:shortcut', type: 'door', label: open ? 'Restored archive route' : 'Faded archive door', hint: open ? 'A revealed route to the archive guardian' : 'A sealed route mark. Restore the map tree and repair the bridge to make it usable.', sprite: { sheet: 'town', index: 74 }, actions: open ? [{ id: 'travel', label: 'Follow the restored archive route', kind: 'storytravel', buildingId: plan.boss.buildingId }] : [{ id: 'inspect', label: 'Inspect the faded route mark', kind: 'inspect', message: 'A route is drawn behind this door, but its connections are missing. The tree sketch and repaired bridge will restore it. The main journal always shows the next clue.' }] });
-    }
+
   }
   let result = { ...scene, objects: (scene.objects || []).filter((object) => !object.id.startsWith('mystery:')).map((object) => {
     if (object.mysteryBaseHint === undefined) return object;
     const { mysteryBaseHint, ...base } = object;
     return { ...base, hint: mysteryBaseHint, actions: object.actions.filter((action) => !action.storyObjectId) };
   }).map((object) => npcContext(object, plan, state)) };
+  return placeSceneObjects(result, definitions, plan.seed);
+}
+
+/** Share safe placement for story and optional activities without a second layout engine. */
+export function placeSceneObjects(scene, definitions, seed, marker = 'storyObjectId') {
+  let result = scene;
   for (const [index, definition] of definitions.entries()) {
-    const placed = safeStoryPlacement(result, definition, plan.seed, index);
+    const placed = safeStoryPlacement(result, definition, seed, index);
     if (placed) { result = { ...result, objects: [...result.objects, placed] }; continue; }
     // Dense imported interiors reuse an existing usable station instead of creating
     // walk-through furniture or sacrificing a required route. Its résumé actions remain.
-    const station = result.objects.filter((object) => object.solid && canStand(object.interactAt, result) && nearestObject(object.interactAt, result)?.id === object.id).sort((a, b) => hashString(`${plan.seed}:${definition.id}:${a.id}`) - hashString(`${plan.seed}:${definition.id}:${b.id}`))[0];
+    const station = result.objects.filter((object) => object.solid && canStand(object.interactAt, result) && nearestObject(object.interactAt, result)?.id === object.id).sort((a, b) => hashString(`${seed}:${definition.id}:${a.id}`) - hashString(`${seed}:${definition.id}:${b.id}`))[0];
     if (!station) throw new Error(`No safe story station for ${definition.id}; the scene was not altered.`);
-    result = { ...result, objects: result.objects.map((object) => object.id === station.id ? { ...object, mysteryBaseHint: object.mysteryBaseHint ?? object.hint, hint: `${object.hint} Also holds: ${definition.label}.`, actions: [...object.actions, ...definition.actions.map((action) => ({ ...action, id: `${definition.id}:${action.id}`, storyObjectId: definition.id }))] } : object) };
+    result = { ...result, objects: result.objects.map((object) => object.id === station.id ? { ...object, mysteryBaseHint: object.mysteryBaseHint ?? object.hint, hint: `${object.hint} Also holds: ${definition.label}.`, actions: [...object.actions, ...definition.actions.map((action) => ({ ...action, id: `${definition.id}:${action.id}`, [marker]: definition.id }))] } : object) };
   }
   return result;
 }

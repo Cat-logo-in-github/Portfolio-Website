@@ -3,7 +3,7 @@ import { defaultInteriorConfig, randomSequence } from './interior.mjs';
 
 export const SAVE_BOOK_KEY = 'parshwa-world:expeditions:v3';
 export const LEGACY_SAVE_KEY = 'parshwa-world:journey:v2';
-export const EXPEDITION_VERSION = 3;
+export const EXPEDITION_VERSION = 4;
 export const MAX_EXPEDITIONS = 12;
 
 export function normalizeSeed(value) {
@@ -36,7 +36,7 @@ export function expeditionInteriorConfig(resume, location, seed) {
 export function createSaveBook(legacySave = '', seed = freshSeed()) {
   const legacy = typeof legacySave === 'string' && legacySave.length > 0;
   const slot = { id: legacy ? 'legacy-v2' : 'expedition-1', seed: legacy ? 'legacy-v2' : normalizeSeed(seed), name: legacy ? 'Your version 2 journey' : 'First expedition', legacy, save: legacy ? legacySave : '' };
-  return { version: 3, activeId: slot.id, slots: [slot], preferences: { audio: { master: 0.6, music: 0.35, sfx: 0.6, muted: false }, encounters: true } };
+  return { version: 3, activeId: slot.id, slots: [slot], preferences: { audio: { master: 0.6, music: 0.35, sfx: 0.6, muted: false }, encounters: true, profile: 'calm' } };
 }
 
 export function activeSlot(book) {
@@ -82,7 +82,7 @@ export function restoreSaveBook(json, legacySave = '', seed = freshSeed()) {
     if (!ids.has(raw.activeId)) throw Error('The active expedition is missing.');
     const audio = raw.preferences?.audio || {};
     const volume = (value, fallback) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
-    return { book: { version: 3, activeId: raw.activeId, slots, preferences: { audio: { master: volume(audio.master, .6), music: volume(audio.music, .35), sfx: volume(audio.sfx, .6), muted: audio.muted === true }, encounters: raw.preferences?.encounters !== false } } };
+    return { book: { version: 3, activeId: raw.activeId, slots, preferences: { audio: { master: volume(audio.master, .6), music: volume(audio.music, .35), sfx: volume(audio.sfx, .6), muted: audio.muted === true }, encounters: raw.preferences?.encounters !== false, profile: ['calm', 'balanced', 'chaotic'].includes(raw.preferences?.profile) ? raw.preferences.profile : 'calm' } } };
   } catch (e) { return { book: createSaveBook(legacySave, seed), warning: `The expedition list could not be loaded: ${e.message} The original stored text has not been deleted; export or back it up before replacing it.`, preserveOriginal: true }; }
 }
 

@@ -1,0 +1,76 @@
+{
+  "version": 4,
+  "style": "slow ambient pads and soft felt keys; no percussion",
+  "tracks": [
+    {
+      "context": "village",
+      "title": "A Slow Morning",
+      "seconds": 192,
+      "sampleRate": 16000,
+      "peak": 0.38,
+      "rms": 0.08931,
+      "largestAdjacentStep": 0.03855,
+      "bytes": 6144044
+    },
+    {
+      "context": "interior",
+      "title": "Lamplight and Pages",
+      "seconds": 192,
+      "sampleRate": 16000,
+      "peak": 0.38,
+      "rms": 0.08272,
+      "largestAdjacentStep": 0.02831,
+      "bytes": 6144044
+    },
+    {
+      "context": "mystery",
+      "title": "The Glasshouse at Dusk",
+      "seconds": 144,
+      "sampleRate": 16000,
+      "peak": 0.38,
+      "rms": 0.08152,
+      "largestAdjacentStep": 0.0274,
+      "bytes": 4608044
+    },
+    {
+      "context": "puzzle",
+      "title": "Small Discoveries",
+      "seconds": 192,
+      "sampleRate": 16000,
+      "peak": 0.38,
+      "rms": 0.08545,
+      "largestAdjacentStep": 0.03392,
+      "bytes": 6144044
+    },
+    {
+      "context": "battle",
+      "title": "A Friendly Disagreement",
+      "seconds": 96,
+      "sampleRate": 16000,
+      "peak": 0.38,
+      "rms": 0.08748,
+      "largestAdjacentStep": 0.02935,
+      "bytes": 3072044
+    },
+    {
+      "context": "boss",
+      "title": "A Question, Gently Asked",
+      "seconds": 96,
+      "sampleRate": 16000,
+      "peak": 0.38,
+      "rms": 0.09366,
+      "largestAdjacentStep": 0.03014,
+      "bytes": 3072044
+    },
+    {
+      "context": "victory",
+      "title": "Room for Tomorrow",
+      "seconds": 96,
+      "sampleRate": 16000,
+      "peak": 0.38,
+      "rms": 0.08321,
+      "largestAdjacentStep": 0.03667,
+      "bytes": 3072044
+    }
+  ]
+}

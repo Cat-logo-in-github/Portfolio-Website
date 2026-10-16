@@ -182,7 +182,7 @@ test('existing NPCs keep source actions and geometry while seed and clue stage c
   assert.ok(variants.size >= 2);
 });
 
-test('reserved portals and visible challenges remain solid at the same coordinates through every story stage', () => {
+test('visible challenges remain solid and no floating doors appear through story stages', () => {
   const seed = 'stable-stations', plan = mysteryPlan(seed, resume, world), states = [createMystery(seed, resume, world)];
   for (const puzzle of plan.puzzles.filter((item) => !item.optional)) states.push(solveMystery(states.at(-1), plan, puzzle.id, puzzle.answer).state);
   states.push(finishMysteryBoss(states.at(-1)));
@@ -200,11 +200,7 @@ test('reserved portals and visible challenges remain solid at the same coordinat
       assert.ok(['guard', 'skirmisher', 'ranger', 'signal', 'mimic'].includes(action.opponent));
       encounterKeys.add(action.encounterKey);
     }
-    if (location.id !== plan.boss.buildingId) {
-      const locked = stages[0].objects.flatMap((object) => object.actions).find((action) => action.id === 'inspect' && action.message?.includes('route is drawn'));
-      assert.ok(locked);
-      assert.ok(stages.at(-1).objects.some((object) => object.actions.some((action) => action.kind === 'storytravel')));
-    }
+    assert.ok(stages.every(scene => !scene.objects.some(object => object.id === 'mystery:shortcut')), 'Secret access is a real boundary destination rather than floating room doors.');
   }
   assert.equal(encounterKeys.size, world.locations.length, 'Each building has its own once-only encounter reward key.');
 });

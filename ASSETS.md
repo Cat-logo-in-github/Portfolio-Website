@@ -58,6 +58,10 @@ The renderer uses semantic furniture types so layouts remain independent of the 
 
 Source and license records are retained in `LICENSE-explorer-actions.txt` and `LICENSE-villager-actions.txt`. No generated artwork is included. Animation is independent of collision geometry, and reduced-motion mode selects fixed, direction-correct poses.
 
-## Version 3 audio
+## Version 4 audio
 
-Seven original music loops and fourteen sound effects are stored locally in `public/audio/`. Their CC0 dedication, format, composition notes and filename inventory are recorded in `public/audio/README.md`. They use original oscillator/noise synthesis and do not contain proprietary samples or game melodies.
+Seven original ambient compositions (1:36–3:12 each, totaling 16:48) replace the short V3 music loops. Fourteen original short sound effects are retained. All files are local in `public/audio/`; the CC0 dedication, format, track inventory and composition notes are in `public/audio/README.md`. The music uses original oscillator synthesis with sustained pads and sparse felt-key gestures, without proprietary samples or game melodies. The optional Python/NumPy composition script is included for editing the score and is not a site-build dependency.
+
+## Version 4 fauna and cozy props
+
+The six fauna reuse Tiny Dungeon indices 124 (Margin/Garden Mouse), 120 (Bookmark Bat/Lantern Moth), 108 (Jelly Byte) and 122 (Clockwork Spider); the roaming caretaker uses 84. Garden Mouse and Lantern Moth are behavior and habitat variants, with fictional names, rather than new sheets. The picnic basket, book exchange, bench, plants, lamps and composed furniture groups reuse the credited local sheets. No new external art files or remote asset dependencies are introduced.

@@ -82,6 +82,7 @@ export type GameObject = {
   sprite: { sheet: "town" | "dungeon" | "interior"; index: number };
   actions: ObjectAction[];
   buildingId?: string;
+  parts?: { sheet: "town" | "dungeon" | "interior"; index: number; x: number; y: number; width?: number; height?: number }[];
   [key: string]: unknown;
 };
 export type Room = {
@@ -108,6 +109,8 @@ export type GameScene = {
     x: number;
     y: number;
     kind: "floor" | "wall" | "corridor" | "door";
+    mask?: number;
+    orientation?: "horizontal" | "vertical";
   }[];
   floor?: string[];
   exit?: Point;
@@ -116,6 +119,11 @@ export type GameScene = {
   config?: InteriorConfig;
   sequence?: number[];
   edges?: { from: number; to: number }[];
+  geometryVersion?: number;
+  entrance?: { room: number; side: 'north'; inside: Point; outside: Point; door: { x: number; y: number; width: number; height: number; orientation: 'horizontal' | 'vertical' }; floor: string[] };
+  habitat?: string;
+  palette?: string;
+  powered?: boolean;
 };
 export type InteriorConfig = {
   algorithmVersion: 2;
